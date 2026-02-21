@@ -28,15 +28,6 @@ export default function Sales() {
     }
   }
 
-  const getStatusClass = (status: string) => {
-    switch (status) {
-      case 'PAGADO': return 'status-badge status-pagado'
-      case 'PARCIAL': return 'status-badge status-parcial'
-      case 'PENDIENTE': return 'status-badge status-pendiente'
-      default: return 'status-badge'
-    }
-  }
-
   return (
     <div className="min-h-screen pb-24">
       <div className="bg-white/5 backdrop-blur-lg border-b border-gold-main/20 sticky top-0 z-10">

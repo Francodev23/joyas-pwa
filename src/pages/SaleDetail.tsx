@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
 import { format } from 'date-fns'
 import { formatPYG, parsePYG } from '../utils/money'
