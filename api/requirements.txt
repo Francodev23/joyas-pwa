@@ -4,7 +4,7 @@ uvicorn[standard]==0.24.0
 python-multipart==0.0.6
 
 # Base de datos
-psycopg[binary]==3.2.9
+psycopg[binary]>=3.2.13,<3.4
 sqlalchemy>=2.0.36,<3.0
 
 # Autenticación y seguridad
