@@ -1,0 +1,112 @@
+BEGIN;
+
+CREATE SCHEMA IF NOT EXISTS joyas;
+
+-- 1) Usuario (login)
+CREATE TABLE IF NOT EXISTS joyas.app_user (
+  id            BIGSERIAL PRIMARY KEY,
+  username      VARCHAR(60) NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 2) Cliente (comprador/a)
+CREATE TABLE IF NOT EXISTS joyas.customer (
+  id          BIGSERIAL PRIMARY KEY,
+  full_name   VARCHAR(120) NOT NULL,
+  phone       VARCHAR(30),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT customer_phone_format CHECK (phone IS NULL OR length(trim(phone)) >= 6)
+);
+CREATE INDEX IF NOT EXISTS idx_customer_full_name ON joyas.customer(full_name);
+
+-- 3) Venta (cabecera)
+CREATE TABLE IF NOT EXISTS joyas.sale (
+  id                 BIGSERIAL PRIMARY KEY,
+  customer_id        BIGINT NOT NULL REFERENCES joyas.customer(id),
+  purchase_date      DATE   NOT NULL DEFAULT CURRENT_DATE,
+  payment_due_date   DATE,
+  delivery_address   TEXT   NOT NULL,
+  notes              TEXT,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT sale_due_after_purchase CHECK (
+    payment_due_date IS NULL OR payment_due_date >= purchase_date
+  )
+);
+CREATE INDEX IF NOT EXISTS idx_sale_purchase_date ON joyas.sale(purchase_date DESC);
+CREATE INDEX IF NOT EXISTS idx_sale_due_date      ON joyas.sale(payment_due_date);
+CREATE INDEX IF NOT EXISTS idx_sale_customer      ON joyas.sale(customer_id);
+
+-- 4) Detalle (lo vendido) - NO inventario, solo registro
+CREATE TABLE IF NOT EXISTS joyas.sale_item (
+  id            BIGSERIAL PRIMARY KEY,
+  sale_id       BIGINT NOT NULL REFERENCES joyas.sale(id) ON DELETE CASCADE,
+  product_code  VARCHAR(50),
+  jewel_type    VARCHAR(80) NOT NULL,
+  quantity      INTEGER NOT NULL DEFAULT 1,
+  unit_price    NUMERIC(12,2) NOT NULL,
+  photo_url     TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT sale_item_qty_pos CHECK (quantity > 0),
+  CONSTRAINT sale_item_unit_price_nonneg CHECK (unit_price >= 0),
+  CONSTRAINT sale_item_photo_url_format CHECK (
+    photo_url IS NULL OR photo_url ~* '^(\/|https?:\/\/).+'
+  )
+);
+CREATE INDEX IF NOT EXISTS idx_sale_item_sale ON joyas.sale_item(sale_id);
+
+-- 5) Pagos parciales
+CREATE TABLE IF NOT EXISTS joyas.payment (
+  id         BIGSERIAL PRIMARY KEY,
+  sale_id    BIGINT NOT NULL REFERENCES joyas.sale(id) ON DELETE CASCADE,
+  paid_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  amount     NUMERIC(12,2) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT payment_amount_pos CHECK (amount > 0)
+);
+CREATE INDEX IF NOT EXISTS idx_payment_sale_paid_at ON joyas.payment(sale_id, paid_at);
+
+-- 6) Vista: balance + estado de cuenta por venta
+CREATE OR REPLACE VIEW joyas.v_sale_statement AS
+WITH totals AS (
+  SELECT
+    s.id AS sale_id,
+    s.customer_id,
+    s.purchase_date,
+    s.payment_due_date,
+    s.delivery_address,
+    COALESCE(SUM(si.quantity * si.unit_price), 0)::NUMERIC(12,2) AS sale_total
+  FROM joyas.sale s
+  LEFT JOIN joyas.sale_item si ON si.sale_id = s.id
+  GROUP BY s.id, s.customer_id, s.purchase_date, s.payment_due_date, s.delivery_address
+),
+paid AS (
+  SELECT sale_id, COALESCE(SUM(amount), 0)::NUMERIC(12,2) AS paid_total
+  FROM joyas.payment
+  GROUP BY sale_id
+)
+SELECT
+  t.sale_id,
+  t.customer_id,
+  t.purchase_date,
+  t.payment_due_date,
+  t.delivery_address,
+  t.sale_total,
+  COALESCE(p.paid_total, 0)::NUMERIC(12,2) AS paid_total,
+  (t.sale_total - COALESCE(p.paid_total, 0))::NUMERIC(12,2) AS remaining,
+  CASE
+    WHEN (t.sale_total - COALESCE(p.paid_total, 0)) <= 0 THEN 'PAGADO'
+    WHEN COALESCE(p.paid_total, 0) > 0 THEN 'PARCIAL'
+    ELSE 'PENDIENTE'
+  END AS account_status
+FROM totals t
+LEFT JOIN paid p ON p.sale_id = t.sale_id;
+
+-- 7) Vista: KPIs globales
+CREATE OR REPLACE VIEW joyas.v_kpis AS
+SELECT
+  (SELECT COALESCE(SUM(quantity), 0) FROM joyas.sale_item) AS total_joyas_vendidas,
+  (SELECT COALESCE(SUM(amount), 0)::NUMERIC(12,2) FROM joyas.payment) AS total_ya_pagado,
+  (SELECT COALESCE(SUM(remaining), 0)::NUMERIC(12,2) FROM joyas.v_sale_statement) AS dinero_faltante;
+
+COMMIT;

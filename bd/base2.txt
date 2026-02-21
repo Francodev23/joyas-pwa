@@ -1,0 +1,19 @@
+CREATE INDEX IF NOT EXISTS idx_sale_due_date_notnull
+ON joyas.sale (payment_due_date)
+WHERE payment_due_date IS NOT NULL;
+
+CREATE OR REPLACE VIEW joyas.v_debtors AS
+SELECT
+  ss.sale_id,
+  ss.customer_id,
+  ss.purchase_date,
+  ss.payment_due_date,
+  ss.delivery_date,
+  ss.delivery_address,
+  ss.sale_total,
+  ss.paid_total,
+  ss.remaining,
+  ss.account_status
+FROM joyas.v_sale_statement ss
+WHERE ss.remaining > 0
+ORDER BY ss.payment_due_date NULLS LAST, ss.purchase_date DESC;

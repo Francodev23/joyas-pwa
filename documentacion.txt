@@ -1,0 +1,17 @@
+Actúa como un experto Full Stack. Necesito terminar de desarrollar una App Web local para registro de ventas de joyas. El objetivo es que sea sencilla, 100% gratuita y funcione localmente con Node.js y PostgreSQL.
+El stack acordado es:
+Backend: Node.js con Express, pg para la base de datos, bcryptjs para contraseñas y express-session para la sesión.
+Frontend: Un solo index.html con Bootstrap.
+Base de Datos: PostgreSQL (ya tengo el script de tablas).
+Requerimientos técnicos que debes implementar:
+Base de Datos: Usa una tabla usuarios y una tabla registros_joyas vinculada por usuario_id.
+Fotos: Las imágenes deben capturarse con la cámara, convertirse a Base64 en el frontend y guardarse como TEXT en la columna foto_data de la DB (para no usar carpetas de archivos).
+GPS: Al guardar, debe capturar automáticamente latitud y longitud usando la API del navegador.
+Sesión: Solo el usuario logueado puede ver y guardar sus propios registros.
+Simplicidad: Todo debe estar en pocos archivos. Usa app.use(express.static('public')) para servir el frontend.
+Archivos a crear/completar:
+server.js: Con las rutas de login, registro, guardado y listado.
+public/index.html: Una interfaz limpia que permita: Login, Sacar Foto (input capture camera), llenar campos (precio, tipo, cliente, tel, dirección) y ver la lista de lo guardado.
+Aquí tienes el SQL de referencia para la DB:
+(Pegar aquí el script de las tablas que te pasé antes)
+Por favor, genera el código completo listo para ejecutar con node server.js."

@@ -1,0 +1,8 @@
+CREATE OR REPLACE VIEW joyas.v_profit_kpis AS
+SELECT
+  COALESCE(SUM(si.quantity * si.unit_price), 0)::NUMERIC(12,2) AS total_vendido,
+  (COALESCE(SUM(si.quantity * si.unit_price), 0) * 0.60)::NUMERIC(12,2) AS dinero_a_entregar,
+  (COALESCE(SUM(si.quantity * si.unit_price), 0) * 0.40)::NUMERIC(12,2) AS ganancia_40
+FROM joyas.sale_item si;
+
+SELECT * FROM joyas.v_profit_kpis;

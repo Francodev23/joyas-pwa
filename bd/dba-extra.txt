@@ -1,0 +1,98 @@
+CREATE OR REPLACE VIEW joyas.v_sale_statement_v2 AS
+WITH totals AS (
+  SELECT
+    s.id AS sale_id,
+    s.customer_id,
+    s.purchase_date,
+    s.payment_due_date,
+    s.delivery_date,
+    s.delivery_address,
+    COALESCE(SUM(si.quantity * si.unit_price), 0)::NUMERIC(12,2) AS sale_total
+  FROM joyas.sale s
+  LEFT JOIN joyas.sale_item si ON si.sale_id = s.id
+  GROUP BY
+    s.id, s.customer_id, s.purchase_date, s.payment_due_date, s.delivery_date, s.delivery_address
+),
+paid AS (
+  SELECT sale_id, COALESCE(SUM(amount), 0)::NUMERIC(12,2) AS paid_total
+  FROM joyas.payment
+  GROUP BY sale_id
+)
+SELECT
+  t.sale_id,
+  t.customer_id,
+  t.purchase_date,
+  t.payment_due_date,
+  t.delivery_date,
+  t.delivery_address,
+  t.sale_total,
+  COALESCE(p.paid_total, 0)::NUMERIC(12,2) AS paid_total,
+  (t.sale_total - COALESCE(p.paid_total, 0))::NUMERIC(12,2) AS remaining,
+  CASE
+    WHEN (t.sale_total - COALESCE(p.paid_total, 0)) <= 0 THEN 'PAGADO'
+    WHEN COALESCE(p.paid_total, 0) > 0 THEN 'PARCIAL'
+    ELSE 'PENDIENTE'
+  END AS account_status
+FROM totals t
+LEFT JOIN paid p ON p.sale_id = t.sale_id;
+CREATE OR REPLACE VIEW joyas.v_kpis AS
+SELECT
+  (SELECT COALESCE(SUM(quantity), 0) FROM joyas.sale_item) AS total_joyas_vendidas,
+  (SELECT COALESCE(SUM(amount), 0)::NUMERIC(12,2) FROM joyas.payment) AS total_ya_pagado,
+  (SELECT COALESCE(SUM(remaining), 0)::NUMERIC(12,2) FROM joyas.v_sale_statement_v2) AS dinero_faltante;
+
+BEGIN;
+
+-- v_kpis ya apunta a v2, entonces v_sale_statement ya no tiene dependientes críticos
+DROP VIEW IF EXISTS joyas.v_sale_statement;
+
+CREATE VIEW joyas.v_sale_statement AS
+WITH totals AS (
+  SELECT
+    s.id AS sale_id,
+    s.customer_id,
+    s.purchase_date,
+    s.payment_due_date,
+    s.delivery_address,
+    s.delivery_date,
+    COALESCE(SUM(si.quantity * si.unit_price), 0)::NUMERIC(12,2) AS sale_total
+  FROM joyas.sale s
+  LEFT JOIN joyas.sale_item si ON si.sale_id = s.id
+  GROUP BY
+    s.id, s.customer_id, s.purchase_date, s.payment_due_date, s.delivery_address, s.delivery_date
+),
+paid AS (
+  SELECT sale_id, COALESCE(SUM(amount), 0)::NUMERIC(12,2) AS paid_total
+  FROM joyas.payment
+  GROUP BY sale_id
+)
+SELECT
+  t.sale_id,
+  t.customer_id,
+  t.purchase_date,
+  t.payment_due_date,
+  t.delivery_address,
+  t.delivery_date,
+  t.sale_total,
+  COALESCE(p.paid_total, 0)::NUMERIC(12,2) AS paid_total,
+  (t.sale_total - COALESCE(p.paid_total, 0))::NUMERIC(12,2) AS remaining,
+  CASE
+    WHEN (t.sale_total - COALESCE(p.paid_total, 0)) <= 0 THEN 'PAGADO'
+    WHEN COALESCE(p.paid_total, 0) > 0 THEN 'PARCIAL'
+    ELSE 'PENDIENTE'
+  END AS account_status
+FROM totals t
+LEFT JOIN paid p ON p.sale_id = t.sale_id;
+
+COMMIT;
+
+
+CREATE OR REPLACE VIEW joyas.v_kpis AS
+SELECT
+  (SELECT COALESCE(SUM(quantity), 0) FROM joyas.sale_item) AS total_joyas_vendidas,
+  (SELECT COALESCE(SUM(amount), 0)::NUMERIC(12,2) FROM joyas.payment) AS total_ya_pagado,
+  (SELECT COALESCE(SUM(remaining), 0)::NUMERIC(12,2) FROM joyas.v_sale_statement) AS dinero_faltante;
+
+
+SELECT delivery_date FROM joyas.v_sale_statement LIMIT 5;
+SELECT * FROM joyas.v_kpis;
