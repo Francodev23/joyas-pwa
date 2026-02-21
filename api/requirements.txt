@@ -15,5 +15,3 @@ passlib[bcrypt]==1.7.4
 pydantic>=2.10,<3
 pydantic-settings>=2.6,<3
 python-dotenv==1.0.0
-
-#Run this command to set up Neon tooling: npx neonctl@latest --force-auth init --agent cursor
