@@ -44,7 +44,9 @@ cors_origins = [
 ]
 if settings.cors_origins:
     # Agregar origins desde variable de entorno (separados por comas)
-    cors_origins.extend([origin.strip() for origin in settings.cors_origins.split(",")])
+    # Filtrar strings vacíos y hacer trim
+    env_origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
+    cors_origins.extend(env_origins)
 
 app.add_middleware(
     CORSMiddleware,
@@ -552,6 +554,17 @@ async def favicon():
 async def health():
     """Healthcheck endpoint para monitoreo"""
     return {"status": "ok"}
+
+
+@app.get("/health/cors")
+async def health_cors():
+    """Endpoint de diagnóstico para CORS"""
+    return {
+        "status": "ok",
+        "cors_origins_loaded": cors_origins,
+        "frontend_origin_expected": "https://joyas-pwa.marcosbenitez7200.workers.dev",
+        "cors_origins_from_env": settings.cors_origins if settings.cors_origins else None
+    }
 
 
 @app.get("/")
