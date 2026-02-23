@@ -8,6 +8,7 @@ from datetime import date, datetime
 from decimal import Decimal
 import os
 import uuid
+import logging
 from pathlib import Path
 
 from database import get_db
@@ -25,6 +26,10 @@ from schemas import (
 from config import settings
 
 app = FastAPI(title="Joyas API", version="1.0.0")
+
+# Configurar logging
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 # Configurar directorio de uploads
 UPLOAD_DIR = Path(__file__).parent / "uploads" / "images"
@@ -63,11 +68,29 @@ app.add_middleware(
 # ========== AUTH ==========
 @app.post("/auth/login", response_model=TokenResponse)
 async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
-    user = authenticate_user(db, credentials.username, credentials.password)
-    if not user:
-        raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
-    access_token = create_access_token(data={"sub": user.username})
-    return {"access_token": access_token, "token_type": "bearer"}
+    try:
+        user = authenticate_user(db, credentials.username, credentials.password)
+        if not user:
+            raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
+        access_token = create_access_token(data={"sub": user.username})
+        return {"access_token": access_token, "token_type": "bearer"}
+    except HTTPException:
+        # Re-lanzar HTTPException (401, etc.) sin logging
+        raise
+    except Exception as e:
+        # Loggear error interno sin exponer datos sensibles
+        error_type = type(e).__name__
+        error_message = str(e)
+        # No loggear password ni token
+        logger.error(
+            f"Error en /auth/login - Tipo: {error_type}, Mensaje: {error_message[:200]}",
+            exc_info=True
+        )
+        # Responder 500 genérico sin exponer detalles
+        raise HTTPException(
+            status_code=500,
+            detail="Error interno del servidor. Por favor, intenta nuevamente."
+        )
 
 
 @app.post("/auth/register")
@@ -557,6 +580,22 @@ async def favicon():
 async def health():
     """Healthcheck endpoint para monitoreo"""
     return {"status": "ok"}
+
+
+@app.get("/health/db")
+async def health_db():
+    """Healthcheck de base de datos (sin exponer credenciales)"""
+    try:
+        from database import engine
+        # Intentar conectar a la base de datos
+        with engine.connect() as conn:
+            # Ejecutar una query simple para verificar conexión
+            conn.execute(text("SELECT 1"))
+        return {"status": "ok"}
+    except Exception as e:
+        # Loggear error sin exponer credenciales
+        logger.error(f"Error de conexión a DB - Tipo: {type(e).__name__}", exc_info=False)
+        return {"status": "error"}
 
 
 @app.get("/health/cors")
