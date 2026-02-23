@@ -1,6 +1,8 @@
 import axios, { AxiosInstance } from 'axios'
 
-const API_URL = import.meta.env.VITE_API_URL || '/api'
+// En producción debe ser la URL completa del backend
+// En desarrollo puede ser '/api' si hay proxy configurado
+const API_URL = import.meta.env.VITE_API_URL || 'https://joyas-pwa.onrender.com'
 
 class ApiService {
   private client: AxiosInstance

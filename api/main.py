@@ -48,6 +48,9 @@ if settings.cors_origins:
     env_origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
     cors_origins.extend(env_origins)
 
+# Eliminar duplicados manteniendo el orden
+cors_origins = list(dict.fromkeys(cors_origins))
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
@@ -559,11 +562,16 @@ async def health():
 @app.get("/health/cors")
 async def health_cors():
     """Endpoint de diagnóstico para CORS"""
+    import os
     return {
         "status": "ok",
         "cors_origins_loaded": cors_origins,
+        "cors_origins_count": len(cors_origins),
         "frontend_origin_expected": "https://joyas-pwa.marcosbenitez7200.workers.dev",
-        "cors_origins_from_env": settings.cors_origins if settings.cors_origins else None
+        "frontend_in_cors_list": "https://joyas-pwa.marcosbenitez7200.workers.dev" in cors_origins,
+        "cors_origins_from_env": settings.cors_origins if settings.cors_origins else None,
+        "cors_origins_from_os_env": os.getenv("CORS_ORIGINS", None),
+        "settings_source": "pydantic-settings (prioridad: OS env > .env file)"
     }
 
 
