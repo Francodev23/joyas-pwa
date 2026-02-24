@@ -524,9 +524,10 @@ export default function NewSale() {
                     <div className="min-w-0">
                       <label className="block text-white/60 text-xs mb-1">Cantidad *</label>
                       <input
-                        type="number"
+                        type="text"
                         inputMode="numeric"
-                        value={item.quantity === '' ? '' : item.quantity}
+                        pattern="[0-9]*"
+                        value={typeof item.quantity === 'string' ? item.quantity : String(item.quantity || '')}
                         onChange={(e) => {
                           const value = e.target.value
                           // Limpiar errores al empezar a escribir
@@ -548,14 +549,9 @@ export default function NewSale() {
                             return
                           }
                           // Solo aceptar dígitos (rechazar letras, símbolos, decimales)
+                          // Guardar como string temporalmente para permitir edición fluida en iOS Safari
                           if (/^\d*$/.test(value)) {
-                            const numValue = parseInt(value, 10)
-                            if (!isNaN(numValue) && numValue > 0 && Number.isInteger(numValue)) {
-                              updateItem(index, 'quantity', numValue)
-                            } else if (value === '') {
-                              // Permitir campo vacío temporalmente
-                              updateItem(index, 'quantity', '')
-                            }
+                            updateItem(index, 'quantity', value)
                           }
                           // Si contiene caracteres inválidos, no actualizar el estado
                         }}
@@ -590,8 +586,6 @@ export default function NewSale() {
                         }}
                         className={`input-field ${itemErrors[index]?.quantity ? 'border-red-400' : ''}`}
                         style={{ fontSize: '16px' }}
-                        min="1"
-                        step="1"
                         required
                       />
                       {itemErrors[index]?.quantity && (
@@ -603,6 +597,7 @@ export default function NewSale() {
                       <input
                         type="text"
                         inputMode="decimal"
+                        pattern="[0-9]*[.,]?[0-9]*"
                         value={item.unit_price}
                         onChange={(e) => {
                           const value = e.target.value
