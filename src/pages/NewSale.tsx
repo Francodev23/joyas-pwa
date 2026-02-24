@@ -6,6 +6,15 @@ import { parsePYG, formatPYG } from '../utils/money'
 
 const API_URL = import.meta.env.VITE_API_URL || '/api'
 
+// Tipo explícito para items de venta
+interface SaleItem {
+  jewel_type: string
+  quantity: number | string  // Permite string temporalmente durante edición
+  unit_price: string | number  // Permite string temporalmente durante edición
+  product_code: string
+  photo_url: string
+}
+
 export default function NewSale() {
   const navigate = useNavigate()
   const [customers, setCustomers] = useState<any[]>([])
@@ -13,9 +22,12 @@ export default function NewSale() {
   const [selectedCustomerName, setSelectedCustomerName] = useState<string>('')
   const [showCustomerModal, setShowCustomerModal] = useState(false)
   const [customerSearch, setCustomerSearch] = useState('')
-  const [items, setItems] = useState([
+  const [items, setItems] = useState<SaleItem[]>([
     { jewel_type: '', quantity: 1, unit_price: '', product_code: '', photo_url: '' }
   ])
+  const [itemErrors, setItemErrors] = useState<Record<number, { quantity?: string; unit_price?: string }>>({})
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [customerError, setCustomerError] = useState<string | null>(null)
   const [deliveryAddress, setDeliveryAddress] = useState('')
   const [deliveryDate, setDeliveryDate] = useState('')
   const [notes, setNotes] = useState('')
@@ -45,17 +57,100 @@ export default function NewSale() {
   }
 
   const addItem = () => {
-    setItems([...items, { jewel_type: '', quantity: 1, unit_price: '', product_code: '', photo_url: '' }])
+    setItems([...items, { jewel_type: '', quantity: 1, unit_price: '', product_code: '', photo_url: '' } as SaleItem])
+    // Limpiar errores del nuevo item (no hay errores aún)
   }
 
   const removeItem = (index: number) => {
     setItems(items.filter((_, i) => i !== index))
+    // Limpiar errores del item eliminado
+    const newErrors = { ...itemErrors }
+    delete newErrors[index]
+    // Reindexar errores si es necesario
+    const reindexedErrors: Record<number, { quantity?: string; unit_price?: string }> = {}
+    Object.keys(newErrors).forEach(key => {
+      const oldIndex = parseInt(key)
+      if (oldIndex > index) {
+        reindexedErrors[oldIndex - 1] = newErrors[oldIndex]
+      } else if (oldIndex < index) {
+        reindexedErrors[oldIndex] = newErrors[oldIndex]
+      }
+    })
+    setItemErrors(reindexedErrors)
   }
 
-  const updateItem = (index: number, field: string, value: any) => {
+  const updateItem = (index: number, field: keyof SaleItem, value: string | number) => {
     const newItems = [...items]
     newItems[index] = { ...newItems[index], [field]: value }
     setItems(newItems)
+  }
+
+  // Validar cantidad: debe ser entero positivo > 0
+  const validateQuantity = (value: string | number): { valid: boolean; error?: string; normalized?: number } => {
+    if (value === '' || value === null || value === undefined) {
+      return { valid: false, error: 'Cantidad es requerida' }
+    }
+    // Convertir a string para validar formato
+    const strValue = typeof value === 'number' ? value.toString() : String(value).trim()
+    // Rechazar si contiene letras o caracteres no numéricos
+    if (!/^\d+$/.test(strValue)) {
+      return { valid: false, error: 'Cantidad debe contener solo números enteros' }
+    }
+    const numValue = parseInt(strValue, 10)
+    if (isNaN(numValue) || numValue <= 0 || !Number.isInteger(numValue)) {
+      return { valid: false, error: 'La cantidad debe ser un número entero mayor a 0' }
+    }
+    return { valid: true, normalized: numValue }
+  }
+
+  // Validar precio unitario: debe ser número válido > 0
+  const validateUnitPrice = (value: string | number): { valid: boolean; error?: string; normalized?: number } => {
+    // Convertir a string si es número
+    const strValue = typeof value === 'number' ? value.toString() : String(value).trim()
+    if (!strValue || strValue === '') {
+      return { valid: false, error: 'Precio unitario es requerido' }
+    }
+    // Validar que solo contenga dígitos, punto o coma (separadores numéricos)
+    // Rechazar letras y símbolos raros
+    const numericPattern = /^[\d.,]+$/
+    const cleaned = strValue.replace(/\s/g, '')
+    if (!numericPattern.test(cleaned)) {
+      return { valid: false, error: 'Precio unitario debe contener solo números' }
+    }
+    const parsed = parsePYG(cleaned)
+    if (isNaN(parsed) || parsed <= 0) {
+      return { valid: false, error: 'El precio unitario debe ser un número mayor a 0' }
+    }
+    return { valid: true, normalized: parsed }
+  }
+
+  // Calcular subtotal de un item (cantidad * precio unitario)
+  const getItemSubtotal = (item: SaleItem): number => {
+    // Parsear cantidad de forma segura
+    const qty = typeof item.quantity === 'number' 
+      ? (isNaN(item.quantity) || item.quantity < 1 ? 1 : Math.floor(item.quantity))
+      : (typeof item.quantity === 'string' && item.quantity !== '' 
+          ? (() => {
+              const parsed = parseInt(item.quantity)
+              return isNaN(parsed) || parsed < 1 ? 1 : parsed
+            })()
+          : 1)
+    // Parsear precio de forma segura
+    const priceStr = typeof item.unit_price === 'string' 
+      ? item.unit_price 
+      : (typeof item.unit_price === 'number' 
+          ? item.unit_price.toString() 
+          : '0')
+    const price = parsePYG(priceStr)
+    // Asegurar que ambos sean números válidos antes de multiplicar
+    const finalQty = isNaN(qty) || qty < 1 ? 1 : qty
+    const finalPrice = isNaN(price) || price < 0 ? 0 : price
+    return finalQty * finalPrice
+  }
+
+  // Calcular total general (suma de todos los subtotales)
+  const getTotal = (): number => {
+    return items.reduce((sum, item) => sum + getItemSubtotal(item), 0)
   }
 
   const handleImageUpload = async (index: number, file: File) => {
@@ -72,24 +167,112 @@ export default function NewSale() {
     setSelectedCustomerName(customer.full_name)
     setShowCustomerModal(false)
     setCustomerSearch('')
+    setCustomerError(null) // Limpiar error al seleccionar cliente
   }
 
   const filteredCustomers = customers.filter(customer =>
     customer.full_name.toLowerCase().includes(customerSearch.toLowerCase())
   )
 
+  // Función para extraer mensaje de error de forma segura
+  const extractErrorMessage = (error: any): string => {
+    // Si es un error de axios con response
+    if (error?.response?.data) {
+      const detail = error.response.data.detail
+      
+      // Si detail es un string, usarlo directamente
+      if (typeof detail === 'string') {
+        return detail
+      }
+      
+      // Si detail es un array (errores de FastAPI/Pydantic)
+      if (Array.isArray(detail)) {
+        return detail
+          .map((err: any) => {
+            if (typeof err === 'string') return err
+            if (err?.msg) return err.msg
+            if (err?.loc && err?.msg) {
+              const field = err.loc[err.loc.length - 1]
+              return `${field}: ${err.msg}`
+            }
+            return JSON.stringify(err)
+          })
+          .join('. ')
+      }
+      
+      // Si detail es un objeto, intentar extraer mensaje
+      if (typeof detail === 'object') {
+        return detail.message || JSON.stringify(detail)
+      }
+    }
+    
+    // Si tiene mensaje directo
+    if (error?.message) {
+      return error.message
+    }
+    
+    // Fallback
+    return 'No se pudo registrar la venta. Verifica los datos.'
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
+    // Limpiar errores previos
+    setSubmitError(null)
+    setCustomerError(null)
+    
     if (!selectedCustomerId) {
-      alert('Selecciona un cliente')
+      setCustomerError('Selecciona un cliente')
       return
     }
 
-    if (items.some(item => !item.jewel_type || !item.unit_price)) {
-      alert('Completa todos los campos de los items')
+    // Validar todos los items antes de guardar
+    const errors: Record<number, { quantity?: string; unit_price?: string }> = {}
+    let hasErrors = false
+
+    items.forEach((item, index) => {
+      const itemError: { quantity?: string; unit_price?: string } = {}
+
+      // Validar tipo de joya
+      if (!item.jewel_type || item.jewel_type.trim() === '') {
+        hasErrors = true
+        // jewel_type no tiene input específico, se maneja con required
+      }
+
+      // Validar cantidad
+      const qtyValidation = validateQuantity(item.quantity)
+      if (!qtyValidation.valid) {
+        itemError.quantity = qtyValidation.error
+        hasErrors = true
+      }
+
+      // Validar precio unitario
+      const unitPriceValue = typeof item.unit_price === 'string' 
+        ? item.unit_price 
+        : (typeof item.unit_price === 'number' 
+            ? item.unit_price.toString() 
+            : '')
+      const priceValidation = validateUnitPrice(unitPriceValue)
+      if (!priceValidation.valid) {
+        itemError.unit_price = priceValidation.error
+        hasErrors = true
+      }
+
+      if (Object.keys(itemError).length > 0) {
+        errors[index] = itemError
+      }
+    })
+
+    if (hasErrors) {
+      setItemErrors(errors)
+      setSubmitError('Por favor, corrige los errores en los items antes de guardar')
       return
     }
+
+    // Limpiar errores si todo está válido
+    setItemErrors({})
+    setSubmitError(null)
 
     setLoading(true)
 
@@ -99,13 +282,37 @@ export default function NewSale() {
       delivery_date: deliveryDate || null,
       notes: notes || null,
       payment_due_date: paymentDueDate || null,
-      items: items.map(item => ({
-        jewel_type: item.jewel_type,
-        quantity: parseInt(item.quantity.toString()),
-        unit_price: parsePYG(item.unit_price.toString()),
-        product_code: item.product_code || null,
-        photo_url: item.photo_url || null,
-      }))
+      items: items.map(item => {
+        // Normalizar quantity: asegurar que sea entero > 0
+        // Ya validado arriba, pero normalizar de forma segura
+        const qtyValidation = validateQuantity(item.quantity)
+        if (!qtyValidation.valid || !qtyValidation.normalized) {
+          // Esto no debería pasar porque ya validamos arriba, pero defensa adicional
+          throw new Error(`Item con cantidad inválida: ${item.quantity}`)
+        }
+        const qty = qtyValidation.normalized
+        
+        // Normalizar unit_price: convertir a string y parsear de forma segura
+        const unitPriceStr = typeof item.unit_price === 'string' 
+          ? item.unit_price 
+          : (typeof item.unit_price === 'number' 
+              ? item.unit_price.toString() 
+              : '0')
+        const priceValidation = validateUnitPrice(unitPriceStr)
+        if (!priceValidation.valid || priceValidation.normalized === undefined) {
+          // Esto no debería pasar porque ya validamos arriba, pero defensa adicional
+          throw new Error(`Item con precio unitario inválido: ${item.unit_price}`)
+        }
+        const unitPrice = priceValidation.normalized
+        
+        return {
+          jewel_type: item.jewel_type,
+          quantity: qty,
+          unit_price: unitPrice,
+          product_code: item.product_code || null,
+          photo_url: item.photo_url || null,
+        }
+      })
     }
 
     try {
@@ -113,11 +320,13 @@ export default function NewSale() {
         await api.createSale(saleData)
       } else {
         await offlineQueue.addOperation('create_sale', saleData)
-        alert('Venta guardada en cola offline. Se sincronizará cuando vuelva la conexión.')
+        // Mensaje informativo para modo offline (no es error)
+        setSubmitError(null)
       }
       navigate('/sales')
     } catch (error: any) {
-      alert(error.response?.data?.detail || 'Error al crear la venta')
+      const errorMessage = extractErrorMessage(error)
+      setSubmitError(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -143,6 +352,13 @@ export default function NewSale() {
         </div>
       )}
 
+      {/* Mensaje de error del submit */}
+      {submitError && (
+        <div className="mx-4 mt-4 bg-red-500/20 border border-red-500/30 text-red-300 px-4 py-3 rounded-xl text-sm">
+          {submitError}
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="px-4 py-6 space-y-6">
         {/* Cliente */}
         <div>
@@ -151,13 +367,16 @@ export default function NewSale() {
           </label>
           <button
             type="button"
-            onClick={() => setShowCustomerModal(true)}
-            className={`input-field text-left ${selectedCustomerId ? 'text-white' : 'text-white/40'}`}
+            onClick={() => {
+              setShowCustomerModal(true)
+              setCustomerError(null) // Limpiar error al abrir modal
+            }}
+            className={`input-field text-left ${selectedCustomerId ? 'text-white' : 'text-white/40'} ${customerError ? 'border-red-400' : ''}`}
           >
             {selectedCustomerName || 'Selecciona un cliente'}
           </button>
-          {!selectedCustomerId && (
-            <p className="text-red-400 text-xs mt-1 ml-1">Campo requerido</p>
+          {(customerError || (!selectedCustomerId && submitError)) && (
+            <p className="text-red-400 text-xs mt-1 ml-1">{customerError || 'Campo requerido'}</p>
           )}
         </div>
 
@@ -298,34 +517,168 @@ export default function NewSale() {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-white/60 text-xs mb-1">Cantidad</label>
+                      <label className="block text-white/60 text-xs mb-1">Cantidad *</label>
                       <input
                         type="number"
-                        value={item.quantity}
-                        onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
-                        className="input-field text-sm"
+                        value={item.quantity === '' ? '' : item.quantity}
+                        onChange={(e) => {
+                          const value = e.target.value
+                          // Limpiar errores al empezar a escribir
+                          if (itemErrors[index]?.quantity) {
+                            const newErrors = { ...itemErrors }
+                            delete newErrors[index]?.quantity
+                            if (Object.keys(newErrors[index] || {}).length === 0) {
+                              delete newErrors[index]
+                            }
+                            setItemErrors(newErrors)
+                          }
+                          // Limpiar error de submit si el usuario corrige
+                          if (submitError) {
+                            setSubmitError(null)
+                          }
+                          // Permitir campo vacío temporalmente mientras se escribe
+                          if (value === '') {
+                            updateItem(index, 'quantity', '')
+                            return
+                          }
+                          // Solo aceptar dígitos (rechazar letras, símbolos, decimales)
+                          if (/^\d*$/.test(value)) {
+                            const numValue = parseInt(value, 10)
+                            if (!isNaN(numValue) && numValue > 0 && Number.isInteger(numValue)) {
+                              updateItem(index, 'quantity', numValue)
+                            } else if (value === '') {
+                              // Permitir campo vacío temporalmente
+                              updateItem(index, 'quantity', '')
+                            }
+                          }
+                          // Si contiene caracteres inválidos, no actualizar el estado
+                        }}
+                        onBlur={(e) => {
+                          // Al perder foco, validar y normalizar
+                          const value = e.target.value
+                          const validation = validateQuantity(value)
+                          if (!validation.valid) {
+                            // Mostrar error pero no normalizar automáticamente
+                            setItemErrors(prev => ({
+                              ...prev,
+                              [index]: { ...prev[index], quantity: validation.error }
+                            }))
+                            // Normalizar a 1 solo si está completamente vacío
+                            if (value === '' || value === null || value === undefined) {
+                              updateItem(index, 'quantity', 1)
+                            }
+                          } else {
+                            // Limpiar error y normalizar valor
+                            const newErrors = { ...itemErrors }
+                            if (newErrors[index]?.quantity) {
+                              delete newErrors[index].quantity
+                              if (Object.keys(newErrors[index] || {}).length === 0) {
+                                delete newErrors[index]
+                              }
+                            }
+                            setItemErrors(newErrors)
+                            if (validation.normalized !== undefined) {
+                              updateItem(index, 'quantity', validation.normalized)
+                            }
+                          }
+                        }}
+                        className={`input-field text-sm ${itemErrors[index]?.quantity ? 'border-red-400' : ''}`}
                         min="1"
+                        step="1"
                         required
                       />
+                      {itemErrors[index]?.quantity && (
+                        <p className="text-red-400 text-xs mt-1">{itemErrors[index].quantity}</p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-white/60 text-xs mb-1">Precio Unitario *</label>
                       <input
                         type="text"
                         value={item.unit_price}
-                        onChange={(e) => updateItem(index, 'unit_price', e.target.value)}
-                        onBlur={(e) => {
-                          const parsed = parsePYG(e.target.value)
-                          if (parsed > 0) {
-                            updateItem(index, 'unit_price', formatPYG(parsed))
+                        onChange={(e) => {
+                          const value = e.target.value
+                          // Limpiar error al empezar a escribir
+                          if (itemErrors[index]?.unit_price) {
+                            const newErrors = { ...itemErrors }
+                            delete newErrors[index]?.unit_price
+                            if (Object.keys(newErrors[index] || {}).length === 0) {
+                              delete newErrors[index]
+                            }
+                            setItemErrors(newErrors)
+                          }
+                          // Limpiar error de submit si el usuario corrige
+                          if (submitError) {
+                            setSubmitError(null)
+                          }
+                          // Permitir solo caracteres válidos para números (dígitos, punto, coma)
+                          // Rechazar letras y símbolos raros
+                          const cleaned = value.replace(/[^\d.,]/g, '')
+                          // Validar que no tenga múltiples puntos o comas inválidos
+                          const parts = cleaned.split(/[.,]/)
+                          if (parts.length > 2) {
+                            // Múltiples separadores, mantener solo el primero
+                            const firstPart = parts[0]
+                            const secondPart = parts.slice(1).join('')
+                            updateItem(index, 'unit_price', firstPart + (secondPart ? '.' + secondPart : ''))
+                          } else {
+                            updateItem(index, 'unit_price', cleaned)
                           }
                         }}
-                        className="input-field text-sm"
+                        onBlur={(e) => {
+                          const value = e.target.value
+                          const validation = validateUnitPrice(value)
+                          if (!validation.valid) {
+                            // Mostrar error
+                            setItemErrors(prev => ({
+                              ...prev,
+                              [index]: { ...prev[index], unit_price: validation.error }
+                            }))
+                            // Si está vacío, dejar vacío (no normalizar a 0)
+                            if (value.trim() === '') {
+                              return
+                            }
+                            // Si tiene valor pero es inválido, intentar parsear y formatear
+                            const parsed = parsePYG(value)
+                            if (parsed >= 0) {
+                              updateItem(index, 'unit_price', formatPYG(parsed))
+                            }
+                          } else {
+                            // Limpiar error y formatear
+                            const newErrors = { ...itemErrors }
+                            if (newErrors[index]?.unit_price) {
+                              delete newErrors[index].unit_price
+                              if (Object.keys(newErrors[index] || {}).length === 0) {
+                                delete newErrors[index]
+                              }
+                            }
+                            setItemErrors(newErrors)
+                            if (validation.normalized !== undefined && validation.normalized >= 0) {
+                              updateItem(index, 'unit_price', formatPYG(validation.normalized))
+                            }
+                          }
+                        }}
+                        className={`input-field text-sm ${itemErrors[index]?.unit_price ? 'border-red-400' : ''}`}
                         placeholder="0"
                         required
                       />
+                      {itemErrors[index]?.unit_price && (
+                        <p className="text-red-400 text-xs mt-1">{itemErrors[index].unit_price}</p>
+                      )}
                     </div>
                   </div>
+
+                  {/* Mostrar subtotal del item */}
+                  {item.unit_price && (
+                    <div className="pt-2 border-t border-white/10">
+                      <div className="flex justify-between items-center">
+                        <span className="text-white/60 text-xs">Subtotal:</span>
+                        <span className="text-gold-main font-semibold">
+                          {formatPYG(getItemSubtotal(item))}
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-white/60 text-xs mb-1">Código de Producto (opcional)</label>
@@ -389,6 +742,18 @@ export default function NewSale() {
             className="input-field min-h-[80px] resize-none"
             placeholder="Notas adicionales..."
           />
+        </div>
+
+        {/* Total General */}
+        <div className="card bg-gold-main/10 border-gold-main/30">
+          <div className="flex justify-between items-center">
+            <span className="text-gold-main text-sm font-semibold uppercase tracking-wider">
+              Total General
+            </span>
+            <span className="text-2xl font-bold text-gold-light">
+              {formatPYG(getTotal())}
+            </span>
+          </div>
         </div>
 
         <button
