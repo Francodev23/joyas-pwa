@@ -91,6 +91,16 @@ class ApiService {
     return data
   }
 
+  async updateSale(id: number, sale: any) {
+    const { data } = await this.client.put(`/sales/${id}`, sale)
+    return data
+  }
+
+  async deleteSale(id: number) {
+    const { data } = await this.client.delete(`/sales/${id}`)
+    return data
+  }
+
   // Payments
   async getPayments(page = 1, pageSize = 20, saleId?: number) {
     const { data } = await this.client.get('/payments', {

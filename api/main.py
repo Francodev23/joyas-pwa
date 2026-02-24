@@ -17,7 +17,7 @@ from models import AppUser, Customer, Sale, SaleItem, Payment
 from schemas import (
     LoginRequest, TokenResponse,
     CustomerCreate, CustomerResponse,
-    SaleCreate, SaleResponse, SaleItemCreate, SaleItemResponse,
+    SaleCreate, SaleResponse, SaleUpdate, SaleItemCreate, SaleItemResponse,
     PaymentCreate, PaymentResponse,
     SaleStatementResponse, KPIsResponse,
     HistoryMonthCustomerResponse,
@@ -332,6 +332,119 @@ async def get_sale_items(
 ):
     items = db.query(SaleItem).filter(SaleItem.sale_id == sale_id).all()
     return items
+
+
+@app.put("/sales/{sale_id}", response_model=SaleResponse)
+async def update_sale(
+    sale_id: int,
+    sale_update: SaleUpdate,
+    db: Session = Depends(get_db),
+    current_user: AppUser = Depends(get_current_user)
+):
+    """Actualizar una venta existente"""
+    # Verificar que la venta existe
+    sale = db.query(Sale).filter(Sale.id == sale_id).first()
+    if not sale:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+    
+    # Iniciar transacción
+    try:
+        # Actualizar datos generales de la venta
+        update_data = sale_update.model_dump(exclude={"items"}, exclude_none=True)
+        for field, value in update_data.items():
+            setattr(sale, field, value)
+        
+        # Si se proporcionan items, actualizar items
+        if sale_update.items is not None:
+            # Validar items antes de actualizar
+            if len(sale_update.items) == 0:
+                raise HTTPException(status_code=422, detail="La venta debe tener al menos un item")
+            
+            for idx, item in enumerate(sale_update.items):
+                # Validación defensiva de cantidad
+                if not isinstance(item.quantity, int):
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"Item {idx + 1}: Cantidad debe ser un número entero"
+                    )
+                if item.quantity <= 0:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"Item {idx + 1}: Cantidad debe ser mayor a 0"
+                    )
+                
+                # Validación defensiva de precio unitario
+                if not isinstance(item.unit_price, (Decimal, int, float)):
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"Item {idx + 1}: Precio unitario debe ser un número válido"
+                    )
+                try:
+                    unit_price_decimal = Decimal(str(item.unit_price))
+                    if unit_price_decimal <= 0:
+                        raise HTTPException(
+                            status_code=422,
+                            detail=f"Item {idx + 1}: Precio unitario debe ser mayor a 0"
+                        )
+                except (ValueError, TypeError) as e:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"Item {idx + 1}: Precio unitario inválido: {str(e)}"
+                    )
+            
+            # Eliminar items existentes
+            db.query(SaleItem).filter(SaleItem.sale_id == sale_id).delete()
+            
+            # Crear nuevos items
+            for item_data in sale_update.items:
+                item_dict = item_data.model_dump()
+                item_dict['quantity'] = int(item_dict['quantity'])
+                item_dict['unit_price'] = Decimal(str(item_dict['unit_price']))
+                db_item = SaleItem(sale_id=sale_id, **item_dict)
+                db.add(db_item)
+        
+        db.commit()
+        db.refresh(sale)
+        return sale
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error al actualizar venta {sale_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Error interno al actualizar la venta")
+
+
+@app.delete("/sales/{sale_id}")
+async def delete_sale(
+    sale_id: int,
+    db: Session = Depends(get_db),
+    current_user: AppUser = Depends(get_current_user)
+):
+    """Eliminar una venta de forma permanente"""
+    # Verificar que la venta existe
+    sale = db.query(Sale).filter(Sale.id == sale_id).first()
+    if not sale:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+    
+    # Iniciar transacción para eliminar en cascada
+    try:
+        # Eliminar pagos relacionados (si existen)
+        from models import Payment
+        db.query(Payment).filter(Payment.sale_id == sale_id).delete()
+        
+        # Eliminar items relacionados (si existen)
+        db.query(SaleItem).filter(SaleItem.sale_id == sale_id).delete()
+        
+        # Eliminar la venta
+        db.delete(sale)
+        
+        db.commit()
+        return {"message": "Venta eliminada correctamente"}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error al eliminar venta {sale_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Error interno al eliminar la venta")
 
 
 # ========== PAYMENTS ==========

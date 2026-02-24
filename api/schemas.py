@@ -85,6 +85,14 @@ class SaleCreate(BaseModel):
     items: list[SaleItemCreate]
 
 
+class SaleUpdate(BaseModel):
+    delivery_address: Optional[str] = None
+    notes: Optional[str] = None
+    payment_due_date: Optional[date] = None
+    delivery_date: Optional[date] = None
+    items: Optional[list[SaleItemCreate]] = None
+
+
 class SaleResponse(BaseModel):
     id: int
     customer_id: int
