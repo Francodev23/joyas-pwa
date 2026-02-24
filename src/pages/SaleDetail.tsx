@@ -320,7 +320,7 @@ export default function SaleDetail() {
   }
 
   return (
-    <div className="min-h-screen pb-6">
+    <div className="min-h-screen pb-6 max-w-full overflow-x-hidden">
       <div className="bg-white/5 backdrop-blur-lg border-b border-gold-main/20 sticky top-0 z-10">
         <div className="px-4 py-4 flex items-center justify-between">
           <button
@@ -401,7 +401,7 @@ export default function SaleDetail() {
         </div>
       )}
 
-      <div className="px-4 py-6 space-y-6">
+      <div className="px-4 py-6 space-y-6 max-w-full overflow-x-hidden">
         {!isEditing ? (
           <>
             {/* Estado */}
@@ -515,6 +515,7 @@ export default function SaleDetail() {
                     value={editingDeliveryAddress}
                     onChange={(e) => setEditingDeliveryAddress(e.target.value)}
                     className="input-field min-h-[100px] resize-none"
+                    style={{ fontSize: '16px' }}
                     required
                   />
                 </div>
@@ -526,6 +527,7 @@ export default function SaleDetail() {
                     value={editingPaymentDueDate}
                     onChange={(e) => setEditingPaymentDueDate(e.target.value)}
                     className="input-field"
+                    style={{ fontSize: '16px' }}
                   />
                 </div>
 
@@ -536,6 +538,7 @@ export default function SaleDetail() {
                     value={editingDeliveryDate}
                     onChange={(e) => setEditingDeliveryDate(e.target.value)}
                     className="input-field"
+                    style={{ fontSize: '16px' }}
                   />
                 </div>
 
@@ -545,6 +548,7 @@ export default function SaleDetail() {
                     value={editingNotes}
                     onChange={(e) => setEditingNotes(e.target.value)}
                     className="input-field min-h-[80px] resize-none"
+                    style={{ fontSize: '16px' }}
                   />
                 </div>
 
@@ -583,16 +587,18 @@ export default function SaleDetail() {
                               type="text"
                               value={item.jewel_type}
                               onChange={(e) => updateEditingItem(index, 'jewel_type', e.target.value)}
-                              className="input-field text-sm"
+                              className="input-field"
+                              style={{ fontSize: '16px' }}
                               required
                             />
                           </div>
 
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
+                          <div className="grid grid-cols-2 gap-3 min-w-0">
+                            <div className="min-w-0 flex-shrink">
                               <label className="block text-white/60 text-xs mb-1">Cantidad *</label>
                               <input
                                 type="number"
+                                inputMode="numeric"
                                 value={item.quantity === '' ? '' : item.quantity}
                                 onChange={(e) => {
                                   const value = e.target.value
@@ -630,7 +636,8 @@ export default function SaleDetail() {
                                     }
                                   }
                                 }}
-                                className={`input-field text-sm ${itemErrors[index]?.quantity ? 'border-red-400' : ''}`}
+                                className={`input-field ${itemErrors[index]?.quantity ? 'border-red-400' : ''}`}
+                                style={{ fontSize: '16px' }}
                                 min="1"
                                 step="1"
                                 required
@@ -639,10 +646,11 @@ export default function SaleDetail() {
                                 <p className="text-red-400 text-xs mt-1">{itemErrors[index].quantity}</p>
                               )}
                             </div>
-                            <div>
+                            <div className="min-w-0 flex-shrink">
                               <label className="block text-white/60 text-xs mb-1">Precio Unitario *</label>
                               <input
                                 type="text"
+                                inputMode="decimal"
                                 value={item.unit_price}
                                 onChange={(e) => {
                                   const value = e.target.value
@@ -693,7 +701,8 @@ export default function SaleDetail() {
                                     }
                                   }
                                 }}
-                                className={`input-field text-sm ${itemErrors[index]?.unit_price ? 'border-red-400' : ''}`}
+                                className={`input-field ${itemErrors[index]?.unit_price ? 'border-red-400' : ''}`}
+                                style={{ fontSize: '16px' }}
                                 placeholder="0"
                                 required
                               />
@@ -709,7 +718,8 @@ export default function SaleDetail() {
                               type="text"
                               value={item.product_code}
                               onChange={(e) => updateEditingItem(index, 'product_code', e.target.value)}
-                              className="input-field text-sm"
+                              className="input-field"
+                              style={{ fontSize: '16px' }}
                             />
                           </div>
                         </div>
@@ -750,7 +760,8 @@ export default function SaleDetail() {
                       setPaymentAmount(formatPYG(parsed))
                     }
                   }}
-                  className="input-field text-sm"
+                  className="input-field"
+                  style={{ fontSize: '16px' }}
                   placeholder="0"
                   required
                 />

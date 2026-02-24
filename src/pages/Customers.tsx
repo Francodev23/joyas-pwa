@@ -58,7 +58,7 @@ export default function Customers() {
   }
 
   return (
-    <div className="min-h-screen pb-6">
+    <div className="min-h-screen pb-6 max-w-full overflow-x-hidden">
       <div className="bg-white/5 backdrop-blur-lg border-b border-gold-main/20 sticky top-0 z-10">
         <div className="px-4 py-4">
           <div className="flex items-center justify-between mb-4">
@@ -85,7 +85,8 @@ export default function Customers() {
               setSearch(e.target.value)
               setPage(1)
             }}
-            className="input-field text-sm"
+            className="input-field"
+            style={{ fontSize: '16px' }}
           />
         </div>
       </div>
@@ -101,7 +102,8 @@ export default function Customers() {
                   type="text"
                   value={formData.full_name}
                   onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                  className="input-field text-sm"
+                  className="input-field"
+                  style={{ fontSize: '16px' }}
                   required
                 />
               </div>
@@ -109,9 +111,11 @@ export default function Customers() {
                 <label className="block text-white/60 text-xs mb-1">Teléfono (opcional)</label>
                 <input
                   type="tel"
+                  inputMode="tel"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="input-field text-sm"
+                  className="input-field"
+                  style={{ fontSize: '16px' }}
                 />
               </div>
               <div className="flex gap-2">

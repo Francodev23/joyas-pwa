@@ -29,7 +29,7 @@ export default function Sales() {
   }
 
   return (
-    <div className="min-h-screen pb-24">
+    <div className="min-h-screen pb-24 max-w-full overflow-x-hidden">
       <div className="bg-white/5 backdrop-blur-lg border-b border-gold-main/20 sticky top-0 z-10">
         <div className="px-4 py-4">
           <div className="flex items-center justify-between mb-4">
@@ -49,9 +49,10 @@ export default function Sales() {
               placeholder="Buscar por nombre..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="input-field text-sm"
-            />
-            <div className="flex gap-2 overflow-x-auto pb-2">
+            className="input-field"
+            style={{ fontSize: '16px' }}
+          />
+            <div className="flex gap-2 overflow-x-auto pb-2 max-w-full">
               <button
                 onClick={() => setStatusFilter('')}
                 className={`px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap ${

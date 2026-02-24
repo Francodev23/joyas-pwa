@@ -333,7 +333,7 @@ export default function NewSale() {
   }
 
   return (
-    <div className="min-h-screen pb-6">
+    <div className="min-h-screen pb-6 max-w-full overflow-x-hidden">
       <div className="bg-white/5 backdrop-blur-lg border-b border-gold-main/20 sticky top-0 z-10">
         <div className="px-4 py-4 flex items-center justify-between">
           <h1 className="text-xl font-semibold text-gold-light">Nueva Venta</h1>
@@ -359,7 +359,7 @@ export default function NewSale() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="px-4 py-6 space-y-6">
+      <form onSubmit={handleSubmit} className="px-4 py-6 space-y-6 max-w-full overflow-x-hidden">
         {/* Cliente */}
         <div>
           <label className="block text-gold-main text-xs uppercase tracking-wider mb-2 ml-1">
@@ -400,7 +400,8 @@ export default function NewSale() {
                   placeholder="Buscar cliente..."
                   value={customerSearch}
                   onChange={(e) => setCustomerSearch(e.target.value)}
-                  className="input-field text-sm"
+                  className="input-field"
+                  style={{ fontSize: '16px' }}
                   autoFocus
                 />
               </div>
@@ -440,6 +441,7 @@ export default function NewSale() {
             value={deliveryAddress}
             onChange={(e) => setDeliveryAddress(e.target.value)}
             className="input-field min-h-[100px] resize-none"
+            style={{ fontSize: '16px' }}
             placeholder="Dirección completa..."
             required
           />
@@ -455,6 +457,7 @@ export default function NewSale() {
             value={deliveryDate}
             onChange={(e) => setDeliveryDate(e.target.value)}
             className="input-field"
+            style={{ fontSize: '16px' }}
           />
         </div>
 
@@ -468,6 +471,7 @@ export default function NewSale() {
             value={paymentDueDate}
             onChange={(e) => setPaymentDueDate(e.target.value)}
             className="input-field"
+            style={{ fontSize: '16px' }}
           />
         </div>
 
@@ -509,17 +513,19 @@ export default function NewSale() {
                       type="text"
                       value={item.jewel_type}
                       onChange={(e) => updateItem(index, 'jewel_type', e.target.value)}
-                      className="input-field text-sm"
+                      className="input-field"
+                      style={{ fontSize: '16px' }}
                       placeholder="Ej: Anillo, Collar, Pulsera..."
                       required
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
-                    <div>
+                    <div className="min-w-0">
                       <label className="block text-white/60 text-xs mb-1">Cantidad *</label>
                       <input
                         type="number"
+                        inputMode="numeric"
                         value={item.quantity === '' ? '' : item.quantity}
                         onChange={(e) => {
                           const value = e.target.value
@@ -582,7 +588,8 @@ export default function NewSale() {
                             }
                           }
                         }}
-                        className={`input-field text-sm ${itemErrors[index]?.quantity ? 'border-red-400' : ''}`}
+                        className={`input-field ${itemErrors[index]?.quantity ? 'border-red-400' : ''}`}
+                        style={{ fontSize: '16px' }}
                         min="1"
                         step="1"
                         required
@@ -591,10 +598,11 @@ export default function NewSale() {
                         <p className="text-red-400 text-xs mt-1">{itemErrors[index].quantity}</p>
                       )}
                     </div>
-                    <div>
+                    <div className="min-w-0 flex-shrink">
                       <label className="block text-white/60 text-xs mb-1">Precio Unitario *</label>
                       <input
                         type="text"
+                        inputMode="decimal"
                         value={item.unit_price}
                         onChange={(e) => {
                           const value = e.target.value
@@ -658,7 +666,8 @@ export default function NewSale() {
                             }
                           }
                         }}
-                        className={`input-field text-sm ${itemErrors[index]?.unit_price ? 'border-red-400' : ''}`}
+                        className={`input-field ${itemErrors[index]?.unit_price ? 'border-red-400' : ''}`}
+                        style={{ fontSize: '16px' }}
                         placeholder="0"
                         required
                       />
@@ -686,7 +695,8 @@ export default function NewSale() {
                       type="text"
                       value={item.product_code}
                       onChange={(e) => updateItem(index, 'product_code', e.target.value)}
-                      className="input-field text-sm"
+                      className="input-field"
+                      style={{ fontSize: '16px' }}
                       placeholder="Código interno..."
                     />
                   </div>
@@ -740,6 +750,7 @@ export default function NewSale() {
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             className="input-field min-h-[80px] resize-none"
+            style={{ fontSize: '16px' }}
             placeholder="Notas adicionales..."
           />
         </div>

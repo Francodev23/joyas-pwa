@@ -54,6 +54,7 @@ export default function Login() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="input-field"
+                style={{ fontSize: '16px' }}
                 placeholder="Tu nombre de usuario"
                 required
                 autoComplete="username"
@@ -69,6 +70,7 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="input-field"
+                style={{ fontSize: '16px' }}
                 placeholder="••••••••"
                 required
                 autoComplete="current-password"
