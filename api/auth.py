@@ -14,7 +14,22 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    """
+    Verifica una contraseña contra un hash bcrypt.
+    Maneja excepciones de passlib/bcrypt de forma segura.
+    """
+    if not plain_password or not hashed_password:
+        return False
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except (ValueError, TypeError, AttributeError) as e:
+        # Hash corrupto, formato inválido, o error de passlib/bcrypt
+        # No loggear el hash ni la contraseña por seguridad
+        return False
+    except Exception as e:
+        # Cualquier otro error inesperado (ej: bcrypt no disponible)
+        # Retornar False en lugar de lanzar excepción
+        return False
 
 
 def get_password_hash(password: str) -> str:
@@ -33,12 +48,24 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 
 
 def authenticate_user(db: Session, username: str, password: str):
-    user = db.query(AppUser).filter(AppUser.username == username).first()
-    if not user:
+    """
+    Autentica un usuario verificando username y password.
+    Maneja errores de DB y verificación de forma segura.
+    """
+    try:
+        user = db.query(AppUser).filter(AppUser.username == username).first()
+        if not user:
+            return False
+        # Validar que el hash existe y no está vacío
+        if not user.password_hash or not user.password_hash.strip():
+            return False
+        if not verify_password(password, user.password_hash):
+            return False
+        return user
+    except Exception as e:
+        # Error de DB o cualquier otro error inesperado
+        # Retornar False en lugar de lanzar excepción
         return False
-    if not verify_password(password, user.password_hash):
-        return False
-    return user
 
 
 async def get_current_user(

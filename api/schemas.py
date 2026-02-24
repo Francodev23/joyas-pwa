@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional
 from datetime import date, datetime
 from decimal import Decimal
@@ -35,9 +35,29 @@ class CustomerResponse(BaseModel):
 class SaleItemCreate(BaseModel):
     product_code: Optional[str] = None
     jewel_type: str
-    quantity: int = 1
-    unit_price: Decimal
+    quantity: int = Field(gt=0, description="Cantidad debe ser un entero mayor a 0")
+    unit_price: Decimal = Field(gt=0, description="Precio unitario debe ser mayor a 0")
     photo_url: Optional[str] = None
+
+    @field_validator('quantity')
+    @classmethod
+    def validate_quantity(cls, v: int) -> int:
+        """Validar que quantity sea entero positivo"""
+        if not isinstance(v, int):
+            raise ValueError('Cantidad debe ser un número entero')
+        if v <= 0:
+            raise ValueError('Cantidad debe ser mayor a 0')
+        return v
+
+    @field_validator('unit_price')
+    @classmethod
+    def validate_unit_price(cls, v: Decimal) -> Decimal:
+        """Validar que unit_price sea positivo"""
+        if not isinstance(v, (Decimal, int, float)):
+            raise ValueError('Precio unitario debe ser un número')
+        if v <= 0:
+            raise ValueError('Precio unitario debe ser mayor a 0')
+        return Decimal(str(v))
 
 
 class SaleItemResponse(BaseModel):

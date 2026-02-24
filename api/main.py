@@ -68,10 +68,18 @@ app.add_middleware(
 # ========== AUTH ==========
 @app.post("/auth/login", response_model=TokenResponse)
 async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
+    """
+    Endpoint de login. Maneja errores de forma segura sin exponer información sensible.
+    """
     try:
+        # Validar que las credenciales no estén vacías
+        if not credentials.username or not credentials.password:
+            raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
+        
         user = authenticate_user(db, credentials.username, credentials.password)
         if not user:
             raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
+        
         access_token = create_access_token(data={"sub": user.username})
         return {"access_token": access_token, "token_type": "bearer"}
     except HTTPException:
@@ -81,7 +89,7 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
         # Loggear error interno sin exponer datos sensibles
         error_type = type(e).__name__
         error_message = str(e)
-        # No loggear password ni token
+        # No loggear password, username ni token
         logger.error(
             f"Error en /auth/login - Tipo: {error_type}, Mensaje: {error_message[:200]}",
             exc_info=True
@@ -167,6 +175,42 @@ async def create_sale(
     if not customer:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
     
+    # Validar items antes de crear la venta (validación defensiva adicional)
+    if not sale.items or len(sale.items) == 0:
+        raise HTTPException(status_code=422, detail="La venta debe tener al menos un item")
+    
+    for idx, item in enumerate(sale.items):
+        # Validación defensiva de cantidad
+        if not isinstance(item.quantity, int):
+            raise HTTPException(
+                status_code=422, 
+                detail=f"Item {idx + 1}: Cantidad debe ser un número entero"
+            )
+        if item.quantity <= 0:
+            raise HTTPException(
+                status_code=422, 
+                detail=f"Item {idx + 1}: Cantidad debe ser mayor a 0"
+            )
+        
+        # Validación defensiva de precio unitario
+        if not isinstance(item.unit_price, (Decimal, int, float)):
+            raise HTTPException(
+                status_code=422, 
+                detail=f"Item {idx + 1}: Precio unitario debe ser un número válido"
+            )
+        try:
+            unit_price_decimal = Decimal(str(item.unit_price))
+            if unit_price_decimal <= 0:
+                raise HTTPException(
+                    status_code=422, 
+                    detail=f"Item {idx + 1}: Precio unitario debe ser mayor a 0"
+                )
+        except (ValueError, TypeError) as e:
+            raise HTTPException(
+                status_code=422, 
+                detail=f"Item {idx + 1}: Precio unitario inválido: {str(e)}"
+            )
+    
     sale_data = sale.model_dump(exclude={"items"})
     if not sale_data.get("purchase_date"):
         sale_data["purchase_date"] = date.today()
@@ -176,7 +220,11 @@ async def create_sale(
     db.flush()
     
     for item_data in sale.items:
-        db_item = SaleItem(sale_id=db_sale.id, **item_data.model_dump())
+        # Asegurar que los valores sean correctos antes de guardar
+        item_dict = item_data.model_dump()
+        item_dict['quantity'] = int(item_dict['quantity'])
+        item_dict['unit_price'] = Decimal(str(item_dict['unit_price']))
+        db_item = SaleItem(sale_id=db_sale.id, **item_dict)
         db.add(db_item)
     
     db.commit()

@@ -5,12 +5,13 @@ import './index.css'
 
 // Registrar Service Worker
 if ('serviceWorker' in navigator) {
-  // Registrar solo en producción o localhost (aceptado en dev)
+  // NO registrar en desarrollo localhost (solo en producción)
   const isLocalhost = window.location.hostname === 'localhost' || 
                       window.location.hostname === '127.0.0.1' ||
                       window.location.hostname === ''
   
-  if (isLocalhost || import.meta.env.PROD) {
+  // Solo registrar en producción (no en desarrollo localhost)
+  if (!isLocalhost && import.meta.env.PROD) {
     window.addEventListener('load', () => {
       navigator.serviceWorker
         .register('/sw.js')
