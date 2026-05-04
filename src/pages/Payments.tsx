@@ -29,7 +29,7 @@ export default function Payments() {
 
   return (
     <div className="min-h-screen pb-24">
-      <div className="bg-white/5 backdrop-blur-lg border-b border-gold-main/20 sticky top-0 z-10">
+      <div className="page-header">
         <div className="px-4 py-4">
           <h1 className="text-xl font-semibold text-gold-light">Pagos</h1>
         </div>

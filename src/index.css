@@ -24,10 +24,31 @@
     overflow-x: hidden;
     max-width: 100vw;
     position: relative;
+    min-height: 100dvh;
   }
 }
 
 @layer components {
+  /* Headers sticky: evita que el notch / status bar tape controles (iOS notch + Android 0) */
+  .page-header {
+    @apply bg-white/5 backdrop-blur-xl border-b border-gold-main/20 sticky top-0 z-10;
+    padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
+  }
+
+  /* Barra fija inferior con home indicator / gestos */
+  .bottom-action-bar {
+    @apply fixed bottom-0 left-0 right-0 z-30 border-t border-gold-main/25 backdrop-blur-xl;
+    background-color: rgba(26, 22, 16, 0.92);
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.45);
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+    padding-left: max(1rem, env(safe-area-inset-left, 0px));
+    padding-right: max(1rem, env(safe-area-inset-right, 0px));
+  }
+
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px] inline-flex items-center justify-center;
+  }
+
   .btn-primary {
     @apply w-full py-4 px-6 bg-gradient-to-r from-gold-deep to-gold-main 
            text-black font-bold rounded-2xl text-lg

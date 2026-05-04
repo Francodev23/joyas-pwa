@@ -112,7 +112,7 @@ export default function History() {
   return (
     <div className="min-h-screen pb-24">
       {/* Header */}
-      <div className="bg-white/5 backdrop-blur-lg border-b border-gold-main/20 sticky top-0 z-10">
+      <div className="page-header">
         <div className="px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button

@@ -320,51 +320,23 @@ export default function SaleDetail() {
   }
 
   return (
-    <div className="min-h-screen pb-6 max-w-full overflow-x-hidden">
-      <div className="bg-white/5 backdrop-blur-lg border-b border-gold-main/20 sticky top-0 z-10">
-        <div className="px-4 py-4 flex items-center justify-between">
+    <div className="min-h-[100dvh] max-w-full overflow-x-hidden pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]">
+      <header className="page-header">
+        <div className="grid grid-cols-[minmax(44px,auto)_1fr_minmax(44px,auto)] items-center gap-2 px-4 pb-3">
           <button
+            type="button"
             onClick={() => navigate('/sales')}
-            className="text-white/60"
+            className="touch-target -ml-2 text-white/80 rounded-2xl px-2 text-sm font-medium active:scale-[0.98] transition-transform hover:text-white"
+            aria-label="Volver a ventas"
           >
             ← Volver
           </button>
-          <h1 className="text-xl font-semibold text-gold-light">Venta #{sale.id}</h1>
-          {!isEditing && (
-            <div className="flex gap-2">
-              <button
-                onClick={startEditing}
-                className="text-gold-main text-sm font-semibold"
-              >
-                Editar
-              </button>
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                className="text-red-400 text-sm font-semibold"
-              >
-                Eliminar
-              </button>
-            </div>
-          )}
-          {isEditing && (
-            <div className="flex gap-2">
-              <button
-                onClick={cancelEditing}
-                className="text-white/60 text-sm"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleSaveEdit}
-                disabled={saving}
-                className="bg-gold-main text-black px-3 py-1 rounded-lg text-sm font-semibold"
-              >
-                {saving ? 'Guardando...' : 'Guardar'}
-              </button>
-            </div>
-          )}
+          <h1 className="text-center text-lg sm:text-xl font-semibold text-gold-light truncate tabular-nums">
+            Venta #{sale.id}
+          </h1>
+          <span className="w-11" aria-hidden />
         </div>
-      </div>
+      </header>
 
       {/* Modal de confirmación de eliminación */}
       {showDeleteConfirm && (
@@ -810,6 +782,47 @@ export default function SaleDetail() {
           )}
         </div>
       </div>
+
+      {!isEditing ? (
+        <nav className="bottom-action-bar" aria-label="Acciones de la venta">
+          <div className="flex gap-3 pt-3">
+            <button
+              type="button"
+              onClick={startEditing}
+              className="touch-target flex-1 rounded-2xl bg-gradient-to-r from-gold-deep to-gold-main text-black font-bold text-sm shadow-lg shadow-black/30 active:scale-[0.98] transition-transform"
+            >
+              Editar
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="touch-target flex-1 rounded-2xl bg-red-500/20 text-red-300 font-semibold text-sm border border-red-400/40 shadow-md active:scale-[0.98] transition-transform"
+            >
+              Eliminar
+            </button>
+          </div>
+        </nav>
+      ) : (
+        <nav className="bottom-action-bar" aria-label="Guardar o cancelar edición">
+          <div className="flex gap-3 pt-3">
+            <button
+              type="button"
+              onClick={cancelEditing}
+              className="touch-target flex-1 rounded-2xl bg-white/10 text-white font-semibold text-sm border border-gold-main/35 backdrop-blur-sm active:scale-[0.98] transition-transform"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveEdit}
+              disabled={saving}
+              className="touch-target flex-1 rounded-2xl bg-gradient-to-r from-gold-deep to-gold-main text-black font-bold text-sm shadow-lg disabled:opacity-50 disabled:scale-100 active:scale-[0.98] transition-transform"
+            >
+              {saving ? 'Guardando…' : 'Guardar'}
+            </button>
+          </div>
+        </nav>
+      )}
     </div>
   )
 }

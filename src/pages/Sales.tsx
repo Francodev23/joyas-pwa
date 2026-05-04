@@ -30,7 +30,7 @@ export default function Sales() {
 
   return (
     <div className="min-h-screen pb-24 max-w-full overflow-x-hidden">
-      <div className="bg-white/5 backdrop-blur-lg border-b border-gold-main/20 sticky top-0 z-10">
+      <div className="page-header">
         <div className="px-4 py-4">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-xl font-semibold text-gold-light">Ventas</h1>
