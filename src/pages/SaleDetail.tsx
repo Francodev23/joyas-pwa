@@ -36,6 +36,7 @@ export default function SaleDetail() {
   const [itemErrors, setItemErrors] = useState<Record<number, { quantity?: string; unit_price?: string }>>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [fabOpen, setFabOpen] = useState(false)
 
   useEffect(() => {
     if (id) {
@@ -320,7 +321,13 @@ export default function SaleDetail() {
   }
 
   return (
-    <div className="min-h-[100dvh] max-w-full overflow-x-hidden pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]">
+    <div
+      className={
+        isEditing
+          ? 'min-h-[100dvh] max-w-full overflow-x-hidden pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]'
+          : 'min-h-[100dvh] max-w-full overflow-x-hidden pb-[max(6.5rem,env(safe-area-inset-bottom,0px))]'
+      }
+    >
       <header className="page-header">
         <div className="grid grid-cols-[minmax(44px,auto)_1fr_minmax(44px,auto)] items-center gap-2 px-4 pb-3">
           <button
@@ -784,24 +791,69 @@ export default function SaleDetail() {
       </div>
 
       {!isEditing ? (
-        <nav className="bottom-action-bar" aria-label="Acciones de la venta">
-          <div className="flex gap-3 pt-3">
+        <>
+          {fabOpen && (
             <button
               type="button"
-              onClick={startEditing}
-              className="touch-target flex-1 rounded-2xl bg-gradient-to-r from-gold-deep to-gold-main text-black font-bold text-sm shadow-lg shadow-black/30 active:scale-[0.98] transition-transform"
-            >
-              Editar
-            </button>
+              className="fixed inset-0 z-[35] cursor-default bg-black/25 backdrop-blur-[2px]"
+              aria-label="Cerrar menú de acciones"
+              onClick={() => setFabOpen(false)}
+            />
+          )}
+          <div
+            className="fixed z-[40] flex flex-col items-end gap-2 pointer-events-none"
+            style={{
+              right: 'max(1rem, env(safe-area-inset-right, 0px))',
+              bottom: 'max(1rem, env(safe-area-inset-bottom, 0px))',
+            }}
+          >
+            {fabOpen && (
+              <div
+                className="pointer-events-auto mb-1 flex w-[min(calc(100vw-2rem),17rem)] flex-col gap-2 rounded-2xl border border-gold-main/25 bg-bg-dark/95 p-2 shadow-2xl backdrop-blur-xl"
+                role="menu"
+                aria-label="Acciones de la venta"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="touch-target w-full justify-start rounded-xl bg-gradient-to-r from-gold-deep to-gold-main px-4 text-left text-sm font-bold text-black shadow-md active:scale-[0.98] transition-transform"
+                  onClick={() => {
+                    startEditing()
+                    setFabOpen(false)
+                  }}
+                >
+                  Editar
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="touch-target w-full justify-start rounded-xl border border-red-400/40 bg-red-500/15 px-4 text-left text-sm font-semibold text-red-300 shadow-md active:scale-[0.98] transition-transform"
+                  onClick={() => {
+                    setShowDeleteConfirm(true)
+                    setFabOpen(false)
+                  }}
+                >
+                  Eliminar
+                </button>
+              </div>
+            )}
             <button
               type="button"
-              onClick={() => setShowDeleteConfirm(true)}
-              className="touch-target flex-1 rounded-2xl bg-red-500/20 text-red-300 font-semibold text-sm border border-red-400/40 shadow-md active:scale-[0.98] transition-transform"
+              onClick={() => setFabOpen((o) => !o)}
+              aria-expanded={fabOpen}
+              aria-haspopup="menu"
+              aria-label={fabOpen ? 'Cerrar acciones' : 'Abrir acciones de la venta'}
+              className="pointer-events-auto flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-gold-deep to-gold-main text-3xl font-light leading-none text-black shadow-[0_8px_28px_rgba(0,0,0,0.45)] ring-2 ring-gold-main/40 active:scale-95 transition-transform"
             >
-              Eliminar
+              <span
+                className={`inline-block origin-center transition-transform duration-200 ${fabOpen ? 'rotate-45' : ''}`}
+                aria-hidden
+              >
+                +
+              </span>
             </button>
           </div>
-        </nav>
+        </>
       ) : (
         <nav className="bottom-action-bar" aria-label="Guardar o cancelar edición">
           <div className="flex gap-3 pt-3">
