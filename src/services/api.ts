@@ -91,6 +91,11 @@ class ApiService {
     return data
   }
 
+  async getSaleDetail(id: number) {
+    const { data } = await this.client.get(`/sales/${id}/detail`)
+    return data
+  }
+
   async updateSale(id: number, sale: any) {
     const { data } = await this.client.put(`/sales/${id}`, sale)
     return data
@@ -127,10 +132,36 @@ class ApiService {
     return data
   }
 
+  async getDashboardSummary(page = 1, pageSize = 10, statusFilter?: string, search?: string) {
+    const { data } = await this.client.get('/dashboard/summary', {
+      params: { page, page_size: pageSize, status_filter: statusFilter, search },
+    })
+    return data
+  }
+
   async getHistoryMonthly(year?: number, month?: number) {
     const { data } = await this.client.get('/history/monthly', {
       params: { year, month },
     })
+    return data
+  }
+
+  async getClosings(page = 1, pageSize = 20) {
+    const { data } = await this.client.get('/closings', {
+      params: { page, page_size: pageSize },
+    })
+    return data
+  }
+
+  async previewClosing(periodStart: string, periodEnd: string) {
+    const { data } = await this.client.get('/closings/preview', {
+      params: { period_start: periodStart, period_end: periodEnd },
+    })
+    return data
+  }
+
+  async createClosing(closing: { period_start: string; period_end: string; notes?: string | null }) {
+    const { data } = await this.client.post('/closings', closing)
     return data
   }
 

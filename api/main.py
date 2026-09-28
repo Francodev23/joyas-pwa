@@ -13,14 +13,17 @@ from pathlib import Path
 
 from database import get_db
 from auth import authenticate_user, create_access_token, get_current_user, get_password_hash
-from models import AppUser, Customer, Sale, SaleItem, Payment
+from models import AppUser, Customer, Sale, SaleItem, Payment, Closing, ClosingSale
 from schemas import (
     LoginRequest, TokenResponse,
     CustomerCreate, CustomerResponse,
-    SaleCreate, SaleResponse, SaleUpdate, SaleItemCreate, SaleItemResponse,
+    SaleCreate, SaleResponse, SaleUpdate, SaleDetailResponse, SaleItemCreate, SaleItemResponse,
     PaymentCreate, PaymentResponse,
     SaleStatementResponse, KPIsResponse,
+    DashboardSummaryResponse,
     HistoryMonthCustomerResponse,
+    ClosingCreate, ClosingPreviewResponse, ClosingResponse,
+    ClosingSalePreviewResponse, ClosingSummaryResponse,
     PaginatedResponse
 )
 from config import settings
@@ -334,6 +337,54 @@ async def get_sale_items(
     return items
 
 
+@app.get("/sales/{sale_id}/detail", response_model=SaleDetailResponse)
+async def get_sale_detail(
+    sale_id: int,
+    db: Session = Depends(get_db),
+    current_user: AppUser = Depends(get_current_user)
+):
+    sale = db.query(Sale).filter(Sale.id == sale_id).first()
+    if not sale:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+
+    statement_result = db.execute(text("""
+        SELECT sale_id, customer_id, purchase_date, payment_due_date,
+               delivery_date, delivery_address, sale_total, paid_total, remaining, account_status
+        FROM joyas.v_sale_statement
+        WHERE sale_id = :sale_id
+    """), {"sale_id": sale_id}).first()
+    if not statement_result:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+
+    items = db.query(SaleItem).filter(SaleItem.sale_id == sale_id).all()
+    payments = (
+        db.query(Payment)
+        .filter(Payment.sale_id == sale_id)
+        .order_by(Payment.paid_at.desc())
+        .all()
+    )
+
+    statement = SaleStatementResponse(
+        sale_id=statement_result.sale_id,
+        customer_id=statement_result.customer_id,
+        purchase_date=statement_result.purchase_date,
+        payment_due_date=statement_result.payment_due_date,
+        delivery_date=statement_result.delivery_date,
+        delivery_address=statement_result.delivery_address,
+        sale_total=statement_result.sale_total,
+        paid_total=statement_result.paid_total,
+        remaining=statement_result.remaining,
+        account_status=statement_result.account_status
+    )
+
+    return SaleDetailResponse(
+        sale=SaleResponse.model_validate(sale),
+        statement=statement,
+        items=[SaleItemResponse.model_validate(item) for item in items],
+        payments=[PaymentResponse.model_validate(payment) for payment in payments]
+    )
+
+
 @app.put("/sales/{sale_id}", response_model=SaleResponse)
 async def update_sale(
     sale_id: int,
@@ -497,27 +548,27 @@ async def list_payments(
 # ========== DASHBOARD / KPIs ==========
 async def _get_kpis_internal(db: Session):
     """Función interna para obtener KPIs"""
-    # Leer de v_kpis
-    stmt_kpis = text("""
-        SELECT 
-            total_joyas_vendidas,
-            total_ya_pagado,
-            dinero_faltante
-        FROM joyas.v_kpis
+    stmt = text("""
+        WITH open_sales AS (
+            SELECT ss.sale_id, ss.sale_total, ss.paid_total, ss.remaining
+            FROM joyas.v_sale_statement ss
+            LEFT JOIN joyas.closing_sale cs ON cs.sale_id = ss.sale_id
+            WHERE cs.sale_id IS NULL
+        ),
+        open_items AS (
+            SELECT si.quantity, si.unit_price
+            FROM joyas.sale_item si
+            JOIN open_sales os ON os.sale_id = si.sale_id
+        )
+        SELECT
+            COALESCE((SELECT SUM(quantity) FROM open_items), 0)::integer AS total_joyas_vendidas,
+            COALESCE((SELECT SUM(paid_total) FROM open_sales), 0)::numeric(12,2) AS total_ya_pagado,
+            COALESCE((SELECT SUM(remaining) FROM open_sales), 0)::numeric(12,2) AS dinero_faltante,
+            COALESCE((SELECT SUM(quantity::numeric * unit_price) FROM open_items), 0)::numeric(12,2) AS total_vendido
     """)
-    result_kpis = db.execute(stmt_kpis).first()
-    
-    # Leer de v_profit_kpis
-    stmt_profit = text("""
-        SELECT 
-            total_vendido,
-            dinero_a_entregar,
-            ganancia_40
-        FROM joyas.v_profit_kpis
-    """)
-    result_profit = db.execute(stmt_profit).first()
-    
-    if not result_kpis:
+    result = db.execute(stmt).first()
+
+    if not result:
         return KPIsResponse(
             total_joyas_vendidas=0,
             total_ya_pagado=Decimal("0"),
@@ -526,14 +577,15 @@ async def _get_kpis_internal(db: Session):
             dinero_a_entregar=Decimal("0"),
             ganancia_40=Decimal("0")
         )
-    
+    total_vendido = result.total_vendido or Decimal("0")
+
     return KPIsResponse(
-        total_joyas_vendidas=result_kpis.total_joyas_vendidas or 0,
-        total_ya_pagado=result_kpis.total_ya_pagado or Decimal("0"),
-        dinero_faltante=result_kpis.dinero_faltante or Decimal("0"),
-        total_vendido=result_profit.total_vendido or Decimal("0") if result_profit else Decimal("0"),
-        dinero_a_entregar=result_profit.dinero_a_entregar or Decimal("0") if result_profit else Decimal("0"),
-        ganancia_40=result_profit.ganancia_40 or Decimal("0") if result_profit else Decimal("0")
+        total_joyas_vendidas=result.total_joyas_vendidas or 0,
+        total_ya_pagado=result.total_ya_pagado or Decimal("0"),
+        dinero_faltante=result.dinero_faltante or Decimal("0"),
+        total_vendido=total_vendido,
+        dinero_a_entregar=(total_vendido * Decimal("0.60")).quantize(Decimal("0.01")),
+        ganancia_40=(total_vendido * Decimal("0.40")).quantize(Decimal("0.01"))
     )
 
 
@@ -555,51 +607,49 @@ async def get_kpis(
     return await _get_kpis_internal(db)
 
 
-@app.get("/dashboard/sales-statements", response_model=PaginatedResponse)
-async def get_sales_statements(
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    status_filter: Optional[str] = Query(None),
-    search: Optional[str] = Query(None),
-    db: Session = Depends(get_db),
-    current_user: AppUser = Depends(get_current_user)
+def _get_sales_statements_page(
+    db: Session,
+    page: int,
+    page_size: int,
+    status_filter: Optional[str] = None,
+    search: Optional[str] = None
 ):
+    """Ventas abiertas para dashboard, excluyendo las ya procesadas en cierres."""
     base_query = """
         FROM joyas.v_sales_active s
         LEFT JOIN joyas.customer c ON c.id = s.customer_id
-        WHERE 1=1
+        LEFT JOIN joyas.closing_sale cs ON cs.sale_id = s.sale_id
+        WHERE cs.sale_id IS NULL
     """
     params = {}
     conditions = []
-    
+
     if status_filter:
         conditions.append("s.account_status = :status_filter")
         params["status_filter"] = status_filter
-    
+
     if search:
         conditions.append("c.full_name ILIKE :search")
         params["search"] = f"%{search}%"
-    
+
     where_clause = " AND " + " AND ".join(conditions) if conditions else ""
-    
-    # Contar total
+
     count_sql = f"SELECT COUNT(*) {base_query}{where_clause}"
     total = db.execute(text(count_sql), params).scalar() or 0
-    
-    # Obtener datos paginados
+
     query_sql = f"""
         SELECT s.sale_id, s.customer_id, s.purchase_date, s.payment_due_date,
                s.delivery_date, s.delivery_address, s.sale_total, s.paid_total, s.remaining, s.account_status,
                c.full_name as customer_name
         {base_query}{where_clause}
-        ORDER BY s.purchase_date DESC
+        ORDER BY s.purchase_date DESC, s.sale_id DESC
         LIMIT :limit OFFSET :offset
     """
     params["limit"] = page_size
     params["offset"] = (page - 1) * page_size
-    
+
     results = db.execute(text(query_sql), params).fetchall()
-    
+
     items = []
     for row in results:
         items.append({
@@ -615,7 +665,7 @@ async def get_sales_statements(
             "remaining": float(row.remaining),
             "account_status": row.account_status
         })
-    
+
     return PaginatedResponse(
         items=items,
         total=total,
@@ -623,6 +673,33 @@ async def get_sales_statements(
         page_size=page_size,
         total_pages=(total + page_size - 1) // page_size
     )
+
+
+@app.get("/dashboard/summary", response_model=DashboardSummaryResponse)
+async def get_dashboard_summary(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
+    status_filter: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: AppUser = Depends(get_current_user)
+):
+    return DashboardSummaryResponse(
+        kpis=await _get_kpis_internal(db),
+        sales=_get_sales_statements_page(db, page, page_size, status_filter, search)
+    )
+
+
+@app.get("/dashboard/sales-statements", response_model=PaginatedResponse)
+async def get_sales_statements(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    status_filter: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: AppUser = Depends(get_current_user)
+):
+    return _get_sales_statements_page(db, page, page_size, status_filter, search)
 
 
 @app.post("/upload/image")
@@ -729,6 +806,249 @@ async def get_history_monthly(
         ))
     
     return items
+
+
+def _closing_sales_query(db: Session, period_start: date, period_end: date):
+    return text("""
+        SELECT
+            ss.sale_id,
+            ss.customer_id,
+            c.full_name AS customer_name,
+            ss.purchase_date,
+            ss.sale_total,
+            ss.paid_total,
+            ss.remaining,
+            ss.account_status,
+            COALESCE(items.total_items, 0)::integer AS total_items
+        FROM joyas.v_sale_statement ss
+        JOIN joyas.customer c ON c.id = ss.customer_id
+        LEFT JOIN (
+            SELECT sale_id, SUM(quantity)::integer AS total_items
+            FROM joyas.sale_item
+            GROUP BY sale_id
+        ) items ON items.sale_id = ss.sale_id
+        LEFT JOIN joyas.closing_sale cs ON cs.sale_id = ss.sale_id
+        WHERE ss.purchase_date BETWEEN :period_start AND :period_end
+          AND ss.remaining <= 0
+          AND cs.sale_id IS NULL
+        ORDER BY ss.purchase_date ASC, ss.sale_id ASC
+    """)
+
+
+def _build_closing_preview(db: Session, period_start: date, period_end: date):
+    if period_end < period_start:
+        raise HTTPException(status_code=422, detail="La fecha final no puede ser anterior a la inicial")
+
+    rows = db.execute(
+        _closing_sales_query(db, period_start, period_end),
+        {"period_start": period_start, "period_end": period_end}
+    ).fetchall()
+
+    sales = [
+        ClosingSalePreviewResponse(
+            sale_id=row.sale_id,
+            customer_id=row.customer_id,
+            customer_name=row.customer_name,
+            purchase_date=row.purchase_date,
+            sale_total=row.sale_total,
+            paid_total=row.paid_total,
+            remaining=row.remaining,
+            total_items=row.total_items,
+            account_status=row.account_status
+        )
+        for row in rows
+    ]
+
+    total_sales = sum((sale.sale_total for sale in sales), Decimal("0"))
+    total_paid = sum((sale.paid_total for sale in sales), Decimal("0"))
+    total_remaining = sum((sale.remaining for sale in sales), Decimal("0"))
+    total_items = sum((sale.total_items for sale in sales), 0)
+
+    summary = ClosingSummaryResponse(
+        period_start=period_start,
+        period_end=period_end,
+        sales_count=len(sales),
+        total_sales=total_sales,
+        total_paid=total_paid,
+        total_remaining=total_remaining,
+        total_items=total_items,
+        money_to_deliver=(total_sales * Decimal("0.60")).quantize(Decimal("0.01")),
+        profit_40=(total_sales * Decimal("0.40")).quantize(Decimal("0.01"))
+    )
+    return ClosingPreviewResponse(summary=summary, sales=sales)
+
+
+@app.get("/closings/preview", response_model=ClosingPreviewResponse)
+async def preview_closing(
+    period_start: date = Query(...),
+    period_end: date = Query(...),
+    db: Session = Depends(get_db),
+    current_user: AppUser = Depends(get_current_user)
+):
+    return _build_closing_preview(db, period_start, period_end)
+
+
+@app.post("/closings", response_model=ClosingResponse)
+async def create_closing(
+    closing_data: ClosingCreate,
+    db: Session = Depends(get_db),
+    current_user: AppUser = Depends(get_current_user)
+):
+    preview = _build_closing_preview(db, closing_data.period_start, closing_data.period_end)
+    if preview.summary.sales_count == 0:
+        raise HTTPException(status_code=422, detail="No hay ventas pagadas sin cerrar en este rango")
+
+    try:
+        closing = Closing(
+            period_start=closing_data.period_start,
+            period_end=closing_data.period_end,
+            notes=closing_data.notes,
+            total_sales=preview.summary.total_sales,
+            total_paid=preview.summary.total_paid,
+            total_remaining=preview.summary.total_remaining,
+            total_items=preview.summary.total_items,
+            money_to_deliver=preview.summary.money_to_deliver,
+            profit_40=preview.summary.profit_40
+        )
+        db.add(closing)
+        db.flush()
+
+        for sale in preview.sales:
+            db.add(ClosingSale(closing_id=closing.id, sale_id=sale.sale_id))
+
+        db.commit()
+        db.refresh(closing)
+        return ClosingResponse(
+            id=closing.id,
+            period_start=closing.period_start,
+            period_end=closing.period_end,
+            closed_at=closing.closed_at,
+            notes=closing.notes,
+            sales_count=preview.summary.sales_count,
+            total_sales=closing.total_sales,
+            total_paid=closing.total_paid,
+            total_remaining=closing.total_remaining,
+            total_items=closing.total_items,
+            money_to_deliver=closing.money_to_deliver,
+            profit_40=closing.profit_40
+        )
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error al crear cierre - Tipo: {type(e).__name__}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Error interno al crear el cierre")
+
+
+@app.get("/closings", response_model=PaginatedResponse)
+async def list_closings(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: AppUser = Depends(get_current_user)
+):
+    total = db.query(Closing).count()
+    closings = (
+        db.query(Closing)
+        .order_by(Closing.closed_at.desc(), Closing.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    sale_counts = dict(
+        db.query(ClosingSale.closing_id, func.count(ClosingSale.sale_id))
+        .filter(ClosingSale.closing_id.in_([closing.id for closing in closings] or [0]))
+        .group_by(ClosingSale.closing_id)
+        .all()
+    )
+
+    items = [
+        ClosingResponse(
+            id=closing.id,
+            period_start=closing.period_start,
+            period_end=closing.period_end,
+            closed_at=closing.closed_at,
+            notes=closing.notes,
+            sales_count=sale_counts.get(closing.id, 0),
+            total_sales=closing.total_sales,
+            total_paid=closing.total_paid,
+            total_remaining=closing.total_remaining,
+            total_items=closing.total_items,
+            money_to_deliver=closing.money_to_deliver,
+            profit_40=closing.profit_40
+        )
+        for closing in closings
+    ]
+
+    return PaginatedResponse(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=(total + page_size - 1) // page_size
+    )
+
+
+@app.get("/closings/{closing_id}", response_model=ClosingPreviewResponse)
+async def get_closing_detail(
+    closing_id: int,
+    db: Session = Depends(get_db),
+    current_user: AppUser = Depends(get_current_user)
+):
+    closing = db.query(Closing).filter(Closing.id == closing_id).first()
+    if not closing:
+        raise HTTPException(status_code=404, detail="Cierre no encontrado")
+
+    rows = db.execute(text("""
+        SELECT
+            ss.sale_id,
+            ss.customer_id,
+            c.full_name AS customer_name,
+            ss.purchase_date,
+            ss.sale_total,
+            ss.paid_total,
+            ss.remaining,
+            ss.account_status,
+            COALESCE(items.total_items, 0)::integer AS total_items
+        FROM joyas.closing_sale cs
+        JOIN joyas.v_sale_statement ss ON ss.sale_id = cs.sale_id
+        JOIN joyas.customer c ON c.id = ss.customer_id
+        LEFT JOIN (
+            SELECT sale_id, SUM(quantity)::integer AS total_items
+            FROM joyas.sale_item
+            GROUP BY sale_id
+        ) items ON items.sale_id = ss.sale_id
+        WHERE cs.closing_id = :closing_id
+        ORDER BY ss.purchase_date ASC, ss.sale_id ASC
+    """), {"closing_id": closing_id}).fetchall()
+
+    sales = [
+        ClosingSalePreviewResponse(
+            sale_id=row.sale_id,
+            customer_id=row.customer_id,
+            customer_name=row.customer_name,
+            purchase_date=row.purchase_date,
+            sale_total=row.sale_total,
+            paid_total=row.paid_total,
+            remaining=row.remaining,
+            total_items=row.total_items,
+            account_status=row.account_status
+        )
+        for row in rows
+    ]
+    summary = ClosingSummaryResponse(
+        period_start=closing.period_start,
+        period_end=closing.period_end,
+        sales_count=len(sales),
+        total_sales=closing.total_sales,
+        total_paid=closing.total_paid,
+        total_remaining=closing.total_remaining,
+        total_items=closing.total_items,
+        money_to_deliver=closing.money_to_deliver,
+        profit_40=closing.profit_40
+    )
+    return ClosingPreviewResponse(summary=summary, sales=sales)
 
 
 @app.get("/favicon.ico")

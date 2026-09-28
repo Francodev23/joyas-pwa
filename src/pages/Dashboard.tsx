@@ -28,13 +28,10 @@ export default function Dashboard() {
 
   const loadData = async () => {
     try {
-      const [kpisData, salesData] = await Promise.all([
-        api.getKPIs(),
-        api.getSalesStatements(page, 10)
-      ])
-      setKpis(kpisData)
-      setSales(salesData.items)
-      setHasMore(salesData.page < salesData.total_pages)
+      const data = await api.getDashboardSummary(page, 10)
+      setKpis(data.kpis)
+      setSales(data.sales.items)
+      setHasMore(data.sales.page < data.sales.total_pages)
     } catch (error) {
       console.error('Error loading dashboard:', error)
     } finally {
@@ -199,24 +196,30 @@ export default function Dashboard() {
 
       {/* Bottom Navigation */}
       <div className="fixed bottom-0 left-0 right-0 bg-white/5 backdrop-blur-lg border-t border-gold-main/20">
-        <div className="grid grid-cols-3 gap-2 p-2">
+        <div className="grid grid-cols-4 gap-1 p-2">
           <Link
             to="/"
-            className="py-3 text-center text-gold-main font-semibold rounded-xl bg-gold-main/10"
+            className="py-3 text-center text-gold-main font-semibold rounded-xl bg-gold-main/10 text-sm"
           >
-            Dashboard
+            Inicio
           </Link>
           <Link
             to="/sales"
-            className="py-3 text-center text-white/60 rounded-xl hover:bg-white/5"
+            className="py-3 text-center text-white/60 rounded-xl hover:bg-white/5 text-sm"
           >
             Ventas
           </Link>
           <Link
             to="/payments"
-            className="py-3 text-center text-white/60 rounded-xl hover:bg-white/5"
+            className="py-3 text-center text-white/60 rounded-xl hover:bg-white/5 text-sm"
           >
             Pagos
+          </Link>
+          <Link
+            to="/closings"
+            className="py-3 text-center text-white/60 rounded-xl hover:bg-white/5 text-sm"
+          >
+            Cierres
           </Link>
         </div>
       </div>

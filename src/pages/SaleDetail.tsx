@@ -46,16 +46,11 @@ export default function SaleDetail() {
 
   const loadSaleData = async () => {
     try {
-      const [saleData, statementData, itemsData, paymentsData] = await Promise.all([
-        api.getSale(parseInt(id!)),
-        api.getSaleStatement(parseInt(id!)),
-        api.getSaleItems(parseInt(id!)),
-        api.getPayments(1, 100, parseInt(id!))
-      ])
-      setSale(saleData)
-      setStatement(statementData)
-      setItems(itemsData)
-      setPayments(paymentsData.items)
+      const detail = await api.getSaleDetail(parseInt(id!))
+      setSale(detail.sale)
+      setStatement(detail.statement)
+      setItems(detail.items)
+      setPayments(detail.payments)
     } catch (error) {
       console.error('Error loading sale:', error)
     } finally {

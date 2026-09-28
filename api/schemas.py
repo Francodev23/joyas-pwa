@@ -108,6 +108,13 @@ class SaleResponse(BaseModel):
         from_attributes = True
 
 
+class SaleDetailResponse(BaseModel):
+    sale: SaleResponse
+    statement: "SaleStatementResponse"
+    items: list[SaleItemResponse]
+    payments: list["PaymentResponse"]
+
+
 # Payment
 class PaymentCreate(BaseModel):
     sale_id: int
@@ -160,6 +167,59 @@ class HistoryMonthCustomerResponse(BaseModel):
     ganancia_40: str
 
 
+class ClosingSalePreviewResponse(BaseModel):
+    sale_id: int
+    customer_id: int
+    customer_name: Optional[str]
+    purchase_date: date
+    sale_total: Decimal
+    paid_total: Decimal
+    remaining: Decimal
+    total_items: int
+    account_status: str
+
+
+class ClosingSummaryResponse(BaseModel):
+    period_start: date
+    period_end: date
+    sales_count: int
+    total_sales: Decimal
+    total_paid: Decimal
+    total_remaining: Decimal
+    total_items: int
+    money_to_deliver: Decimal
+    profit_40: Decimal
+
+
+class ClosingPreviewResponse(BaseModel):
+    summary: ClosingSummaryResponse
+    sales: list[ClosingSalePreviewResponse]
+
+
+class ClosingCreate(BaseModel):
+    period_start: date
+    period_end: date
+    notes: Optional[str] = None
+
+
+class ClosingResponse(BaseModel):
+    id: int
+    period_start: date
+    period_end: date
+    closed_at: datetime
+    notes: Optional[str]
+    sales_count: int = 0
+    total_sales: Decimal
+    total_paid: Decimal
+    total_remaining: Decimal
+    total_items: int
+    money_to_deliver: Decimal
+    profit_40: Decimal
+
+    class Config:
+        from_attributes = True
+
+
 # Pagination
 class PaginatedResponse(BaseModel):
     items: list
@@ -167,4 +227,9 @@ class PaginatedResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
+
+
+class DashboardSummaryResponse(BaseModel):
+    kpis: KPIsResponse
+    sales: PaginatedResponse
 

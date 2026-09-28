@@ -48,6 +48,13 @@ venv/
 api/uploads/
 uploads/
 
+# Database local dumps / copies
+# No subimos backups de Neon ni copias locales de producción al repo
+backup/
+db_backup/
+*.dump
+*.sql
+
 # Node / Vite
 node_modules/
 dist/

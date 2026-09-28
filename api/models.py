@@ -1,4 +1,4 @@
-from sqlalchemy import Column, BigInteger, String, Text, Integer, Numeric, Date, DateTime, ForeignKey
+from sqlalchemy import Column, BigInteger, String, Text, Integer, Numeric, Date, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
@@ -66,5 +66,38 @@ class Payment(Base):
     amount = Column(Numeric(12, 2), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
+    sale = relationship("Sale")
+
+
+class Closing(Base):
+    __tablename__ = "closing"
+    __table_args__ = {"schema": "joyas"}
+
+    id = Column(BigInteger, primary_key=True)
+    period_start = Column(Date, nullable=False)
+    period_end = Column(Date, nullable=False)
+    closed_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    notes = Column(Text)
+    total_sales = Column(Numeric(12, 2), nullable=False)
+    total_paid = Column(Numeric(12, 2), nullable=False)
+    total_remaining = Column(Numeric(12, 2), nullable=False)
+    total_items = Column(Integer, nullable=False)
+    money_to_deliver = Column(Numeric(12, 2), nullable=False)
+    profit_40 = Column(Numeric(12, 2), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class ClosingSale(Base):
+    __tablename__ = "closing_sale"
+    __table_args__ = (
+        UniqueConstraint("sale_id", name="uq_closing_sale_sale_id"),
+        {"schema": "joyas"},
+    )
+
+    closing_id = Column(BigInteger, ForeignKey("joyas.closing.id", ondelete="CASCADE"), primary_key=True)
+    sale_id = Column(BigInteger, ForeignKey("joyas.sale.id", ondelete="RESTRICT"), primary_key=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    closing = relationship("Closing")
     sale = relationship("Sale")
 

@@ -8,6 +8,7 @@ import NewSale from './pages/NewSale'
 import Customers from './pages/Customers'
 import Payments from './pages/Payments'
 import History from './pages/History'
+import Closings from './pages/Closings'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth()
@@ -34,6 +35,7 @@ function AppRoutes() {
       <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
       <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
       <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
+      <Route path="/closings" element={<ProtectedRoute><Closings /></ProtectedRoute>} />
     </Routes>
   )
 }

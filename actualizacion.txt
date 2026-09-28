@@ -1,0 +1,31 @@
+Actúa como un desarrollador senior en React + FastAPI.
+
+Necesito que implementes validación estricta de fechas en el módulo de ventas, sin romper nada existente.
+
+REGLAS:
+
+1. La fecha de entrega (delivery_date) NO puede ser menor que la fecha de compra (purchase_date).
+2. La fecha de vencimiento (payment_due_date) NO puede ser menor que la fecha de compra.
+3. Permitir igualdad (>=), pero nunca menor.
+
+BACKEND (FastAPI):
+- Agregar validación en el endpoint de creación de ventas.
+- Si no se cumple, lanzar HTTPException 422 con mensaje claro:
+  "La fecha de entrega no puede ser anterior a la fecha de compra"
+- NO crear archivos nuevos.
+- NO modificar lógica existente fuera de validación.
+
+FRONTEND (React):
+- Validar antes de enviar el formulario.
+- Mostrar error visual (NO alert, NO console.log).
+- Mensaje claro debajo del campo.
+- No permitir submit si hay error.
+
+UX:
+- Si el usuario selecciona una fecha inválida, mostrar error inmediato.
+- Mantener diseño actual, solo agregar validación.
+
+IMPORTANTE:
+- No romper inputs actuales
+- No afectar otras pantallas
+- Código limpio, minimalista y seguro para producción
