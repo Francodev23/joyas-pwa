@@ -9,7 +9,7 @@ export default defineConfig({
       // Desactivar registro automático de SW (usamos registro manual en main.tsx)
       injectRegister: null,
       // Solo usar para generar manifest, no para SW
-      registerType: 'prompt',
+      registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       manifest: {
         name: 'Joyas - Control de Ventas',
@@ -40,8 +40,10 @@ export default defineConfig({
           }
         ]
       },
-      // Desactivar workbox (usamos SW manual)
-      workbox: false
+      workbox: {
+        clientsClaim: true,
+        skipWaiting: true,
+      }
     })
   ],
   server: {
