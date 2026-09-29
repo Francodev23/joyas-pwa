@@ -619,6 +619,11 @@ def _get_sales_statements_page(
         FROM joyas.v_sales_active s
         LEFT JOIN joyas.customer c ON c.id = s.customer_id
         LEFT JOIN joyas.closing_sale cs ON cs.sale_id = s.sale_id
+        LEFT JOIN (
+            SELECT sale_id, SUM(quantity)::integer AS total_items
+            FROM joyas.sale_item
+            GROUP BY sale_id
+        ) items ON items.sale_id = s.sale_id
         WHERE cs.sale_id IS NULL
     """
     params = {}
@@ -640,7 +645,8 @@ def _get_sales_statements_page(
     query_sql = f"""
         SELECT s.sale_id, s.customer_id, s.purchase_date, s.payment_due_date,
                s.delivery_date, s.delivery_address, s.sale_total, s.paid_total, s.remaining, s.account_status,
-               c.full_name as customer_name
+               c.full_name as customer_name,
+               COALESCE(items.total_items, 0)::integer AS total_items
         {base_query}{where_clause}
         ORDER BY s.purchase_date DESC, s.sale_id DESC
         LIMIT :limit OFFSET :offset
@@ -663,7 +669,8 @@ def _get_sales_statements_page(
             "sale_total": float(row.sale_total),
             "paid_total": float(row.paid_total),
             "remaining": float(row.remaining),
-            "account_status": row.account_status
+            "account_status": row.account_status,
+            "total_items": row.total_items
         })
 
     return PaginatedResponse(

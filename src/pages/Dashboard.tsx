@@ -161,6 +161,9 @@ export default function Dashboard() {
                   <div className="text-sm text-white/60">
                     {format(new Date(sale.purchase_date), "d 'de' MMMM, yyyy")}
                   </div>
+                  <div className="text-xs text-gold-main font-semibold mt-2">
+                    ITEM: {sale.total_items || 0}
+                  </div>
                 </div>
                 <span className={getStatusClass(sale.account_status)}>
                   {sale.account_status}
